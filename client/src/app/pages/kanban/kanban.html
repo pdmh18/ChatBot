@@ -1,0 +1,139 @@
+﻿<h2>Kanban Board</h2>
+
+<div class="kanban-board">
+  <div class="kanban-column">
+    <h3>Todo</h3>
+
+    <div
+      cdkDropList
+      #todoList="cdkDropList"
+      [cdkDropListData]="todo"
+      [cdkDropListConnectedTo]="[inProgressList, reviewList, doneList]"
+      class="task-list"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (task of todo; track task.id) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="kanban-column">
+    <h3>In Progress</h3>
+
+    <div
+      cdkDropList
+      #inProgressList="cdkDropList"
+      [cdkDropListData]="inProgress"
+      [cdkDropListConnectedTo]="[todoList, reviewList, doneList]"
+      class="task-list"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (task of inProgress; track task.id) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="kanban-column">
+    <h3>Review</h3>
+
+    <div
+      cdkDropList
+      #reviewList="cdkDropList"
+      [cdkDropListData]="review"
+      [cdkDropListConnectedTo]="[todoList, inProgressList, doneList]"
+      class="task-list"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (task of review; track task.id) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="kanban-column">
+    <h3>Done</h3>
+
+    <div
+      cdkDropList
+      #doneList="cdkDropList"
+      [cdkDropListData]="done"
+      [cdkDropListConnectedTo]="[todoList, inProgressList, reviewList]"
+      class="task-list"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (task of done; track task.id) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

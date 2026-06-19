@@ -1,0 +1,236 @@
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.toolbar input,
+.toolbar select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #cfd6e1;
+  border-radius: 6px;
+  background: white;
+}
+
+.add-btn {
+  height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.task-table {
+  width: 100%;
+  margin-top: 18px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: white;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.task-table th {
+  background: #f8fafc;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  padding: 14px 12px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.task-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #edf0f3;
+  vertical-align: middle;
+}
+
+.task-table tr:last-child td {
+  border-bottom: none;
+}
+
+.task-table tr:hover {
+  background: #f9fbfd;
+}
+
+.task-table button {
+  margin-right: 8px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.task-table button:last-child {
+  background: #16a34a;
+}
+
+.task-detail {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: white;
+}
+
+.task-detail h3 {
+  margin-top: 0;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1200;
+}
+
+.modal {
+  width: min(720px, calc(100vw - 32px));
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: #18202b;
+  color: white;
+}
+
+.modal-header h3,
+.modal-header p {
+  margin: 0;
+}
+
+.modal-header p {
+  margin-top: 4px;
+  color: #cbd5e1;
+}
+
+.modal-header button {
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.developer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.developer-card {
+  display: grid;
+  grid-template-columns: 1fr 120px 80px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+}
+
+.developer-card p {
+  margin: 6px 0 0;
+  color: #667085;
+}
+
+.developer-score span {
+  display: block;
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.developer-score small {
+  color: #667085;
+}
+
+.developer-card button {
+  height: 38px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.task-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 18px;
+}
+
+.task-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-form input,
+.task-form select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #cfd6e1;
+  border-radius: 6px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid #e1e5ea;
+}
+
+.primary-btn,
+.secondary-btn {
+  height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.primary-btn {
+  background: #2563eb;
+  color: white;
+}
+
+.secondary-btn {
+  background: #e5e7eb;
+  color: #111827;
+}
+.success-message,
+.form-error {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.success-message {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.form-error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}

@@ -1,0 +1,22 @@
+<div class="layout">
+  <aside class="sidebar">
+    <div>
+      <h2>AI Project</h2>
+
+      <nav>
+        <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+        <a routerLink="/tasks" routerLinkActive="active">Tasks</a>
+        <a routerLink="/kanban" routerLinkActive="active">Kanban</a>
+        <a routerLink="/gantt" routerLinkActive="active">Gantt</a>
+        <a routerLink="/ai-alerts" routerLinkActive="active">AI Alerts</a>
+      </nav>
+    </div>
+
+    <button type="button" class="logout-btn" (click)="logout()">Đăng xuất</button>
+  </aside>
+
+  <main class="content">
+    <router-outlet></router-outlet>
+  </main>
+  <app-floating-ai-bot></app-floating-ai-bot>
+</div>
