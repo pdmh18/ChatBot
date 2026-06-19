@@ -1,0 +1,36 @@
+<h2>AI Alerts</h2>
+
+<section class="alert-section">
+  <h3>Dự báo task trễ hạn</h3>
+
+  @for (item of lateRisks; track item.task) {
+    <div class="alert-card danger">
+      <strong>{{ item.task }}</strong>
+      <p>Nguy cơ trễ hạn: {{ item.risk }}%</p>
+      <small>{{ item.reason }}</small>
+    </div>
+  }
+</section>
+
+<section class="alert-section">
+  <h3>Phát hiện điểm nghẽn</h3>
+
+  @for (item of bottlenecks; track item.task) {
+    <div class="alert-card warning">
+      <strong>{{ item.task }}</strong>
+      <p>Đang chặn {{ item.blockedTasks }} task khác</p>
+    </div>
+  }
+</section>
+
+<section class="alert-section">
+  <h3>Gợi ý giao việc</h3>
+
+  @for (item of suggestions; track item.task) {
+    <div class="alert-card success">
+      <strong>{{ item.task }}</strong>
+      <p>Nên giao cho: {{ item.developer }}</p>
+      <small>Độ phù hợp: {{ item.score }}%</small>
+    </div>
+  }
+</section>

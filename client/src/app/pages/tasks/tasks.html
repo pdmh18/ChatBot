@@ -1,0 +1,55 @@
+<h2>Tasks</h2>
+
+<table class="task-table">
+  <thead>
+    <tr>
+        <th>Tên task</th>
+        <th>Dự án</th>
+        <th>Sprint</th>
+        <th>Người phụ trách</th>
+        <th>Trạng thái</th>
+        <th>Ưu tiên</th>
+        <th>Deadline</th>
+        <th>Risk AI</th>
+        <th>Hành động</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    @for (task of tasks; track task.name) {
+      <tr>
+        <td>{{ task.name }}</td>
+        <td>{{ task.project }}</td>
+        <td>{{ task.sprint }}</td>
+        <td>{{ task.assignee }}</td>
+        <td>{{ task.status }}</td>
+        <td>{{ task.priority }}</td>
+        <td>{{ task.deadline }}</td>
+        <td>{{ task.riskScore }}%</td>
+        <td>
+        <button type="button" (click)="selectTask(task)">Xem</button>
+        <button type="button" (click)="showAiSuggestion(task)">Gợi ý AI</button>
+        </td>
+    }
+  </tbody>
+</table>
+@if (selectedTask) {
+  <div class="task-detail">
+    <h3>Chi tiết task</h3>
+
+    <p><b>Tên task:</b> {{ selectedTask.name }}</p>
+    <p><b>Dự án:</b> {{ selectedTask.project }}</p>
+    <p><b>Sprint:</b> {{ selectedTask.sprint }}</p>
+    <p><b>Người phụ trách:</b> {{ selectedTask.assignee }}</p>
+    <p><b>Trạng thái:</b> {{ selectedTask.status }}</p>
+    <p><b>Ưu tiên:</b> {{ selectedTask.priority }}</p>
+    <p><b>Deadline:</b> {{ selectedTask.deadline }}</p>
+    <p><b>Risk AI:</b> {{ selectedTask.riskScore }}%</p>
+  </div>
+}
+@if (aiSuggestion) {
+  <div class="ai-box">
+    <h3>Gợi ý AI Bot</h3>
+    <p>{{ aiSuggestion }}</p>
+  </div>
+}

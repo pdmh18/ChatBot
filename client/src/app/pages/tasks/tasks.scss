@@ -1,0 +1,51 @@
+.task-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.task-table th,
+.task-table td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+}
+
+.task-table th {
+  background: #f1f5f9;
+}
+
+.task-table tr:hover {
+  background: #f9fafb;
+}
+.task-detail {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.task-detail h3 {
+  margin-top: 0;
+}
+
+button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+.ai-box {
+  margin-top: 16px;
+  padding: 16px;
+  border-left: 4px solid #f59e0b;
+  background: #fff7ed;
+  border-radius: 8px;
+}

@@ -1,0 +1,42 @@
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.kanban-column {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.kanban-column h3 {
+  margin-top: 0;
+}
+
+.task-list {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-card {
+  padding: 12px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #ddd;
+  cursor: grab;
+}
+
+.task-card:active {
+  cursor: grabbing;
+}
+
+.cdk-drag-preview {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.3;
+}
