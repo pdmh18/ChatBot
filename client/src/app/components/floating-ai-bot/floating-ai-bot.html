@@ -1,0 +1,49 @@
+@if (isOpen) {
+  <div class="chat-window">
+    <header class="chat-header">
+      <div>
+        <strong>AI Project Assistant</strong>
+        <span>Online</span>
+      </div>
+
+      <button type="button" (click)="toggleChat()">X</button>
+    </header>
+
+    <div class="quick-questions">
+      @for (question of quickQuestions; track question) {
+        <button type="button" (click)="askQuick(question)">
+          {{ question }}
+        </button>
+      }
+    </div>
+
+    <div class="chat-body">
+      @for (message of messages; track message.content) {
+        <div class="message" [class.user]="message.role === 'user'" [class.bot]="message.role === 'bot'">
+          {{ message.content }}
+        </div>
+      }
+
+      @if (isTyping) {
+        <div class="message bot typing">
+          AI đang phân tích...
+        </div>
+      }
+    </div>
+
+    <div class="chat-input">
+      <input
+        type="text"
+        placeholder="Hỏi AI về rủi ro dự án..."
+        [(ngModel)]="userInput"
+        (keydown.enter)="sendMessage()"
+      />
+
+      <button type="button" (click)="sendMessage()">Gửi</button>
+    </div>
+  </div>
+}
+
+<button type="button" class="chat-toggle" (click)="toggleChat()">
+  AI
+</button>

@@ -1,10 +1,11 @@
 import { Component } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../services/auth';
+import { FloatingAiBot } from '../../components/floating-ai-bot/floating-ai-bot';
 
 @Component({
   selector: 'app-main-layout',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, FloatingAiBot],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',
 })

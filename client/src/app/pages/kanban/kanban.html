@@ -12,8 +12,25 @@
       class="task-list"
       (cdkDropListDropped)="drop($event)"
     >
-      @for (task of todo; track task) {
-        <div class="task-card" cdkDrag>{{ task }}</div>
+      @for (task of todo; track task.name) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
       }
     </div>
   </div>
@@ -29,8 +46,25 @@
       class="task-list"
       (cdkDropListDropped)="drop($event)"
     >
-      @for (task of inProgress; track task) {
-        <div class="task-card" cdkDrag>{{ task }}</div>
+      @for (task of inProgress; track task.name) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
       }
     </div>
   </div>
@@ -46,8 +80,25 @@
       class="task-list"
       (cdkDropListDropped)="drop($event)"
     >
-      @for (task of review; track task) {
-        <div class="task-card" cdkDrag>{{ task }}</div>
+      @for (task of review; track task.name) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
       }
     </div>
   </div>
@@ -63,8 +114,25 @@
       class="task-list"
       (cdkDropListDropped)="drop($event)"
     >
-      @for (task of done; track task) {
-        <div class="task-card" cdkDrag>{{ task }}</div>
+      @for (task of done; track task.name) {
+        <div class="task-card" cdkDrag>
+          <div class="task-title">{{ task.name }}</div>
+
+          <div class="task-meta">
+            <span>{{ task.assignee }}</span>
+            <span>{{ task.deadline }}</span>
+          </div>
+
+          <div class="task-footer">
+            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
+              {{ task.priority }}
+            </span>
+
+            <span class="risk" [class.risky]="task.riskScore >= 70">
+              Risk {{ task.riskScore }}%
+            </span>
+          </div>
+        </div>
       }
     </div>
   </div>

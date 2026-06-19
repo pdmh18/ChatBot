@@ -11,10 +11,19 @@ export class AiAlerts {
   lateRisks: any[] = [];
   bottlenecks: any[] = [];
   suggestions: any[] = [];
+  selectedBottleneck: any = null;
 
   constructor(private aiService: AiService) {
     this.lateRisks = this.aiService.getLateRisks();
     this.bottlenecks = this.aiService.getBottlenecks();
     this.suggestions = this.aiService.getAssigneeSuggestions();
+  }
+
+  openBottleneckAlert(item: any) {
+    this.selectedBottleneck = item;
+  }
+
+  closeBottleneckAlert() {
+    this.selectedBottleneck = null;
   }
 }

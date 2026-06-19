@@ -21,3 +21,57 @@
     <p>3</p>
   </div>
 </div>
+
+<div class="charts">
+  <div class="chart-card">
+    <h3>Trạng thái task</h3>
+
+    <canvas
+      baseChart
+      [data]="taskStatusChart"
+      [type]="'doughnut'"
+    ></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h3>Mức độ rủi ro task</h3>
+
+    <canvas
+      baseChart
+      [data]="riskChart"
+      [type]="'bar'"
+    ></canvas>
+  </div>
+</div>
+
+<div class="insights">
+  <section class="insight-card">
+    <h3>Task rủi ro cao</h3>
+
+    @for (task of highRiskTasks; track task.name) {
+      <div class="insight-row">
+        <div>
+          <strong>{{ task.name }}</strong>
+          <p>{{ task.assignee }} · Deadline {{ task.deadline }}</p>
+        </div>
+
+        <span class="risk-badge">{{ task.riskScore }}%</span>
+      </div>
+    }
+  </section>
+
+  <section class="insight-card">
+    <h3>Top điểm nghẽn</h3>
+
+    @for (item of topBottlenecks; track item.name) {
+      <div class="insight-row">
+        <div>
+          <strong>{{ item.name }}</strong>
+          <p>Đang chặn {{ item.blockedTasks }} task khác</p>
+        </div>
+
+        <span class="severity-badge">{{ item.severity }}</span>
+      </div>
+    }
+  </section>
+</div>

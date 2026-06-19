@@ -30,3 +30,80 @@
 .danger p {
   color: red;
 }
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.chart-card {
+  padding: 20px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.chart-card h3 {
+  margin: 0 0 16px;
+}
+
+.chart-card canvas {
+  max-height: 320px;
+}
+
+.insights {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.insight-card {
+  padding: 20px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.insight-card h3 {
+  margin: 0 0 16px;
+}
+
+.insight-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #edf0f3;
+}
+
+.insight-row:first-of-type {
+  border-top: none;
+}
+
+.insight-row p {
+  margin: 6px 0 0;
+  color: #667085;
+}
+
+.risk-badge,
+.severity-badge {
+  min-width: 64px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.risk-badge {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.severity-badge {
+  background: #fef3c7;
+  color: #b45309;
+}
