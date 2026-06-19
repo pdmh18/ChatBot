@@ -1,13 +1,15 @@
-import { TestBed } from '@angular/core/testing';
+﻿import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { AiService } from './ai';
 
-import { Ai } from './ai';
-
-describe('Ai', () => {
-  let service: Ai;
+describe('AiService', () => {
+  let service: AiService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(Ai);
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient()],
+    });
+    service = TestBed.inject(AiService);
   });
 
   it('should be created', () => {
