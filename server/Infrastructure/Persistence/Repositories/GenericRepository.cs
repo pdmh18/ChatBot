@@ -6,10 +6,10 @@ namespace Infrastructure.Persistence.Repositories;
 
 public class GenericRepository<T> : IRepository<T> where T : class
 {
-    protected readonly AppDbContext _context;
+    protected readonly QuanLyDuAnAiContext _context;
     protected readonly DbSet<T> _dbSet;
 
-    public GenericRepository(AppDbContext context)
+    public GenericRepository(QuanLyDuAnAiContext context)
     {
         _context = context;
         _dbSet = context.Set<T>();

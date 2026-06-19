@@ -15,8 +15,8 @@ public static class InfrastructureExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         // DbContext
-        services.AddDbContext<AppDbContext>(opt =>
-            opt.UseNpgsql(config.GetConnectionString("Default")));
+        services.AddDbContext<QuanLyDuAnAiContext>(opt =>
+    opt.UseSqlServer(config.GetConnectionString("Default")));
 
         // Repositories
         services.AddScoped<IUnitOfWork, UnitOfWork>();

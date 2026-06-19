@@ -45,13 +45,13 @@ builder.Services.AddCors(opt => opt.AddPolicy("AllowAll", p =>
     p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
 var app = builder.Build();
-
+// dùng db first
 // Auto migrate
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
-}
+//using (var scope = app.Services.CreateScope())
+//{
+//    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+//    await db.Database.MigrateAsync();
+//}
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseCors("AllowAll");
