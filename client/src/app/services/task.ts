@@ -1,12 +1,14 @@
-import { Injectable } from '@angular/core';
+﻿import { Injectable } from '@angular/core';
+import { Task } from '../models/task';
 
 @Injectable({
   providedIn: 'root',
 })
 export class TaskService {
-  getTasks() {
+  getTasks(): Task[] {
     return [
       {
+        id: 1,
         name: 'Thiết kế database',
         project: 'AI Project Risk',
         sprint: 'Sprint 1',
@@ -17,6 +19,7 @@ export class TaskService {
         riskScore: 82,
       },
       {
+        id: 2,
         name: 'API đăng nhập',
         project: 'AI Project Risk',
         sprint: 'Sprint 1',
@@ -27,6 +30,7 @@ export class TaskService {
         riskScore: 45,
       },
       {
+        id: 3,
         name: 'Màn hình Kanban',
         project: 'AI Project Risk',
         sprint: 'Sprint 2',
@@ -35,6 +39,28 @@ export class TaskService {
         priority: 'High',
         deadline: '2026-06-30',
         riskScore: 68,
+      },
+      {
+        id: 4,
+        name: 'Dashboard thống kê',
+        project: 'AI Project Risk',
+        sprint: 'Sprint 2',
+        assignee: 'Oanh',
+        status: 'Review',
+        priority: 'Medium',
+        deadline: '2026-06-26',
+        riskScore: 35,
+      },
+      {
+        id: 5,
+        name: 'Khởi tạo Angular project',
+        project: 'AI Project Risk',
+        sprint: 'Sprint 1',
+        assignee: 'Oanh',
+        status: 'Done',
+        priority: 'Low',
+        deadline: '2026-06-20',
+        riskScore: 10,
       },
     ];
   }

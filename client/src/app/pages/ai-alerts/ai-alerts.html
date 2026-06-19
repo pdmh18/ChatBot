@@ -1,9 +1,9 @@
-<h2>AI Alerts</h2>
+﻿<h2>AI Alerts</h2>
 
 <section class="alert-section">
   <h3>Dự báo task trễ hạn</h3>
 
-  @for (item of lateRisks; track item.task) {
+  @for (item of lateRisks; track item.id) {
     <div class="alert-card danger">
       <strong>{{ item.task }}</strong>
       <p>Nguy cơ trễ hạn: {{ item.risk }}%</p>
@@ -15,18 +15,18 @@
 <section class="alert-section">
   <h3>Phát hiện điểm nghẽn</h3>
 
-  @for (item of bottlenecks; track item.task) {
-    <div class="alert-card warning" (click)="openBottleneckAlert(item)">
+  @for (item of bottlenecks; track item.id) {
+    <button type="button" class="alert-card warning" (click)="openBottleneckAlert(item)">
       <strong>{{ item.task }}</strong>
       <p>Đang chặn {{ item.blockedTasks }} task khác</p>
-    </div>
+    </button>
   }
 </section>
 
 <section class="alert-section">
   <h3>Gợi ý giao việc</h3>
 
-  @for (item of suggestions; track item.task) {
+  @for (item of suggestions; track item.id) {
     <div class="alert-card success">
       <strong>{{ item.task }}</strong>
       <p>Nên giao cho: {{ item.developer }}</p>

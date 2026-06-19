@@ -1,13 +1,22 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+﻿import { ChangeDetectorRef, Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+
+interface ChatMessage {
+  id: number;
+  role: 'bot' | 'user';
+  content: string;
+}
 
 @Component({
   selector: 'app-floating-ai-bot',
+  standalone: true,
   imports: [FormsModule],
   templateUrl: './floating-ai-bot.html',
   styleUrl: './floating-ai-bot.scss',
 })
 export class FloatingAiBot {
+  private messageId = 0;
+
   isOpen = false;
   userInput = '';
   isTyping = false;
@@ -18,8 +27,9 @@ export class FloatingAiBot {
     'Nên giao API đăng nhập cho ai?',
   ];
 
-  messages = [
+  messages: ChatMessage[] = [
     {
+      id: this.messageId++,
       role: 'bot',
       content:
         'Xin chào, tôi là AI Bot hỗ trợ PM phân tích rủi ro, điểm nghẽn và gợi ý phân công task.',
@@ -28,7 +38,7 @@ export class FloatingAiBot {
 
   constructor(private cdr: ChangeDetectorRef) {}
 
-  toggleChat() {
+  toggleChat(): void {
     this.isOpen = !this.isOpen;
 
     if (!this.isOpen) {
@@ -36,7 +46,7 @@ export class FloatingAiBot {
     }
   }
 
-  askQuick(question: string) {
+  askQuick(question: string): void {
     if (this.isTyping) {
       return;
     }
@@ -45,7 +55,7 @@ export class FloatingAiBot {
     this.sendMessage();
   }
 
-  sendMessage() {
+  sendMessage(): void {
     const text = this.userInput.trim();
 
     if (!text || this.isTyping) {
@@ -53,6 +63,7 @@ export class FloatingAiBot {
     }
 
     this.messages.push({
+      id: this.messageId++,
       role: 'user',
       content: text,
     });
@@ -62,6 +73,7 @@ export class FloatingAiBot {
 
     setTimeout(() => {
       this.messages.push({
+        id: this.messageId++,
         role: 'bot',
         content: this.getMockReply(text),
       });
@@ -71,7 +83,7 @@ export class FloatingAiBot {
     }, 500);
   }
 
-  getMockReply(question: string) {
+  getMockReply(question: string): string {
     const lowerQuestion = question.toLowerCase();
 
     if (lowerQuestion.includes('trễ') || lowerQuestion.includes('tre')) {

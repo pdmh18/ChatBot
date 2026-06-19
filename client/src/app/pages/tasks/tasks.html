@@ -1,4 +1,8 @@
-<h2>Tasks</h2>
+﻿<h2>Tasks</h2>
+
+@if (successMessage) {
+  <div class="success-message">{{ successMessage }}</div>
+}
 
 <div class="toolbar">
   <input
@@ -43,7 +47,7 @@
   </thead>
 
   <tbody>
-    @for (task of filteredTasks; track task.name) {
+    @for (task of filteredTasks; track task.id) {
       <tr>
         <td>{{ task.name }}</td>
         <td>{{ task.project }}</td>
@@ -90,7 +94,7 @@
       </header>
 
       <div class="developer-list">
-        @for (developer of suggestedDevelopers; track developer.name) {
+        @for (developer of suggestedDevelopers; track developer.id) {
           <div class="developer-card">
             <div>
               <strong>{{ developer.name }}</strong>
@@ -125,9 +129,13 @@
       </header>
 
       <div class="task-form">
+        @if (formMessage) {
+          <div class="form-error">{{ formMessage }}</div>
+        }
+
         <label>
           Tên task
-          <input type="text" [(ngModel)]="newTask.name" />
+          <input type="text" [(ngModel)]="newTask.name" maxlength="80" />
         </label>
 
         <label>

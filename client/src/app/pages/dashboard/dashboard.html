@@ -1,25 +1,12 @@
-<h2>Dashboard</h2>
+﻿<h2>Dashboard</h2>
 
 <div class="stats">
-  <div class="card">
-    <h3>Tổng dự án</h3>
-    <p>4</p>
-  </div>
-
-  <div class="card">
-    <h3>Tổng task</h3>
-    <p>28</p>
-  </div>
-
-  <div class="card warning">
-    <h3>Task nguy cơ trễ hạn</h3>
-    <p>7</p>
-  </div>
-
-  <div class="card danger">
-    <h3>Điểm nghẽn</h3>
-    <p>3</p>
-  </div>
+  @for (stat of stats; track stat.label) {
+    <div class="card" [class.warning]="stat.type === 'warning'" [class.danger]="stat.type === 'danger'">
+      <h3>{{ stat.label }}</h3>
+      <p>{{ stat.value }}</p>
+    </div>
+  }
 </div>
 
 <div class="charts">
@@ -48,7 +35,7 @@
   <section class="insight-card">
     <h3>Task rủi ro cao</h3>
 
-    @for (task of highRiskTasks; track task.name) {
+    @for (task of highRiskTasks; track task.id) {
       <div class="insight-row">
         <div>
           <strong>{{ task.name }}</strong>
@@ -63,7 +50,7 @@
   <section class="insight-card">
     <h3>Top điểm nghẽn</h3>
 
-    @for (item of topBottlenecks; track item.name) {
+    @for (item of topBottlenecks; track item.id) {
       <div class="insight-row">
         <div>
           <strong>{{ item.name }}</strong>

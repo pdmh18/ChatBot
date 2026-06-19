@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+﻿import { Component, OnInit } from '@angular/core';
+import { AssigneeSuggestion, Bottleneck, LateRisk } from '../../models/ai';
 import { AiService } from '../../services/ai';
 
 @Component({
@@ -7,23 +8,25 @@ import { AiService } from '../../services/ai';
   templateUrl: './ai-alerts.html',
   styleUrl: './ai-alerts.scss',
 })
-export class AiAlerts {
-  lateRisks: any[] = [];
-  bottlenecks: any[] = [];
-  suggestions: any[] = [];
-  selectedBottleneck: any = null;
+export class AiAlerts implements OnInit {
+  lateRisks: LateRisk[] = [];
+  bottlenecks: Bottleneck[] = [];
+  suggestions: AssigneeSuggestion[] = [];
+  selectedBottleneck: Bottleneck | null = null;
 
-  constructor(private aiService: AiService) {
+  constructor(private aiService: AiService) {}
+
+  ngOnInit(): void {
     this.lateRisks = this.aiService.getLateRisks();
     this.bottlenecks = this.aiService.getBottlenecks();
     this.suggestions = this.aiService.getAssigneeSuggestions();
   }
 
-  openBottleneckAlert(item: any) {
+  openBottleneckAlert(item: Bottleneck): void {
     this.selectedBottleneck = item;
   }
 
-  closeBottleneckAlert() {
+  closeBottleneckAlert(): void {
     this.selectedBottleneck = null;
   }
 }

@@ -1,6 +1,27 @@
-import { Component } from '@angular/core';
+﻿import { Component } from '@angular/core';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration } from 'chart.js';
+
+interface DashboardStat {
+  label: string;
+  value: number;
+  type?: 'warning' | 'danger';
+}
+
+interface HighRiskTask {
+  id: number;
+  name: string;
+  riskScore: number;
+  deadline: string;
+  assignee: string;
+}
+
+interface BottleneckSummary {
+  id: number;
+  name: string;
+  blockedTasks: number;
+  severity: 'High' | 'Medium' | 'Low';
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -9,6 +30,13 @@ import { ChartConfiguration } from 'chart.js';
   styleUrl: './dashboard.scss',
 })
 export class Dashboard {
+  stats: DashboardStat[] = [
+    { label: 'Tổng dự án', value: 4 },
+    { label: 'Tổng task', value: 28 },
+    { label: 'Task nguy cơ trễ hạn', value: 7, type: 'warning' },
+    { label: 'Điểm nghẽn', value: 3, type: 'danger' },
+  ];
+
   taskStatusChart: ChartConfiguration<'doughnut'>['data'] = {
     labels: ['Todo', 'In Progress', 'Review', 'Done'],
     datasets: [
@@ -30,14 +58,16 @@ export class Dashboard {
     ],
   };
 
-  highRiskTasks = [
+  highRiskTasks: HighRiskTask[] = [
     {
+      id: 1,
       name: 'Thiết kế database',
       riskScore: 82,
       deadline: '2026-06-25',
       assignee: 'An',
     },
     {
+      id: 2,
       name: 'Màn hình Kanban',
       riskScore: 68,
       deadline: '2026-06-30',
@@ -45,13 +75,15 @@ export class Dashboard {
     },
   ];
 
-  topBottlenecks = [
+  topBottlenecks: BottleneckSummary[] = [
     {
+      id: 1,
       name: 'Database Schema',
       blockedTasks: 5,
       severity: 'High',
     },
     {
+      id: 2,
       name: 'API Authentication',
       blockedTasks: 3,
       severity: 'Medium',

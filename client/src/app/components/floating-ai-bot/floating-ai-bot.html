@@ -1,4 +1,4 @@
-@if (isOpen) {
+﻿@if (isOpen) {
   <div class="chat-window">
     <header class="chat-header">
       <div>
@@ -18,7 +18,7 @@
     </div>
 
     <div class="chat-body">
-      @for (message of messages; track message.content) {
+      @for (message of messages; track message.id) {
         <div class="message" [class.user]="message.role === 'user'" [class.bot]="message.role === 'bot'">
           {{ message.content }}
         </div>
