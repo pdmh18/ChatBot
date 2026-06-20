@@ -105,6 +105,8 @@ def fill_null_features(df, cols):
 # ============================================================
 
 def lam_giau_khoi_luong(df, col="KhoiLuongHienTaiNhanSu"):
+    if df.empty:
+        return df
     if col not in df.columns:
         return df
     zero_pct = (df[col] == 0).sum() / len(df)
@@ -117,6 +119,8 @@ def lam_giau_khoi_luong(df, col="KhoiLuongHienTaiNhanSu"):
 
 
 def lam_giau_nguoi_dung(df, so_luong_can=50):
+    if df.empty:
+        return df
     if len(df) >= 10:
         print(f"   NguoiDung đủ: {len(df)} người")
         return df
@@ -139,7 +143,7 @@ def lam_giau_nguoi_dung(df, so_luong_can=50):
 # BƯỚC 3: TẠO PREPROCESSING PIPELINE
 # ============================================================
 
-def tao_preprocessing_pipeline():
+def tao_preprocessing_pipeline(smote_k_neighbors=5):
     """
     Pipeline gồm 2 bước:
       1. MinMaxScaler  → chuẩn hóa feature về [0, 1]
@@ -150,7 +154,8 @@ def tao_preprocessing_pipeline():
     """
     pipeline = Pipeline([
         ('scaler', MinMaxScaler()),
-        ('smote',  SMOTE(random_state=42)),
+        ('smote',  SMOTE(random_state=42, k_neighbors=smote_k_neighbors)),
+
     ])
     return pipeline
 
@@ -163,9 +168,20 @@ def chay_pipeline(df, feature_cols, label_col, pipeline_name, test_size=0.2):
       3. Transform test (chỉ scaler, không SMOTE)
       4. Lưu pipeline
     """
-    valid_cols = [c for c in feature_cols if c in df.columns]
+    missing_features = [c for c in feature_cols if c not in df.columns]
+    if missing_features:
+        raise ValueError(f"Missing required feature columns: {missing_features}")
+
+    if label_col not in df.columns:
+        raise ValueError(f"Missing required label column: {label_col}")
+
+    valid_cols = feature_cols
     X = df[valid_cols].copy()
     y = df[label_col].copy()
+
+    class_counts = y.value_counts()
+    if class_counts.min() < 2:
+        raise ValueError(f"Not enough samples to stratify: {dict(class_counts)}")
 
     # SPLIT TRƯỚC — fix data leak
     X_train, X_test, y_train, y_test = train_test_split(
@@ -175,9 +191,13 @@ def chay_pipeline(df, feature_cols, label_col, pipeline_name, test_size=0.2):
         stratify=y
     )
     print(f"   Split: Train {len(X_train)} | Test {len(X_test)}")
+    train_counts = y_train.value_counts()
+    smote_k = min(5, int(train_counts.min()) - 1)
+    if smote_k < 1:
+        raise ValueError(f"Not enough minority samples for SMOTE: {dict(train_counts)}")
 
     # FIT PIPELINE TRÊN TRAIN
-    pipeline = tao_preprocessing_pipeline()
+    pipeline = tao_preprocessing_pipeline(smote_k_neighbors=smote_k)
     X_train_processed, y_train_processed = pipeline.fit_resample(X_train, y_train)
 
     print(f"   Trước SMOTE: {dict(y_train.value_counts())}")
@@ -188,10 +208,15 @@ def chay_pipeline(df, feature_cols, label_col, pipeline_name, test_size=0.2):
     scaler     = pipeline.named_steps['scaler']
     X_test_scaled = scaler.transform(X_test)
 
-    # Lưu pipeline (bao gồm cả scaler bên trong)
-    pipeline_path = MODEL_DIR / pipeline_name
-    joblib.dump(pipeline, pipeline_path)
-    print(f"   Pipeline lưu tại: {pipeline_path}")
+    # Lưu riêng artifact cho train-time (SMOTE) và inference-time (scaler)
+    train_pipeline_path = MODEL_DIR / pipeline_name.replace(".joblib", "_train.joblib")
+    inference_scaler_path = MODEL_DIR / pipeline_name.replace(".joblib", "_scaler.joblib")
+
+    joblib.dump(pipeline, train_pipeline_path)
+    joblib.dump(pipeline.named_steps["scaler"], inference_scaler_path)
+
+    print(f"   Pipeline lưu tại: {train_pipeline_path}")
+    print(f"   Scaler lưu tại: {inference_scaler_path}")
 
     # Tạo DataFrame để lưu CSV
     X_train_df = pd.DataFrame(X_train_processed, columns=valid_cols)
@@ -289,6 +314,7 @@ def main():
     print(f"   Pipeline lưu tại: {MODEL_DIR}")
     print(f"     risk_pipeline.joblib       ← dùng khi predict task mới")
     print(f"     assignment_pipeline.joblib ← dùng khi predict giao việc")
+    print(f"     _scaler.joblib             ← dùng khi inference")
     print("=" * 60)
 
 

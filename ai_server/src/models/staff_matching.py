@@ -5,6 +5,8 @@ view v_Dataset_DeXuatGiaoViec (đã có sẵn label Nhan_GiaoViecHieuQua).
 
 Chạy: python -m src.models.staff_matching
 """
+from email.policy import default
+
 import pandas as pd
 from pathlib import Path
 
@@ -18,9 +20,16 @@ def calculate_fit_score(nhan_su_row: dict, do_phuc_tap: float = 0.5) -> dict:
     - 30%: kinh nghiệm phù hợp độ phức tạp task
     - 20%: nghịch đảo phần trăm tải hiện tại (workload thấp -> điểm cao)
     """
-    so_nam_kinh_nghiem = nhan_su_row.get("SoNamKinhNghiem") or 0
-    khoi_luong_hien_tai = nhan_su_row.get("KhoiLuongHienTai") or 0
-    khoi_luong_toi_da = nhan_su_row.get("KhoiLuongToiDa") or 1
+    # so_nam_kinh_nghiem = nhan_su_row.get("SoNamKinhNghiem") or 0
+    # khoi_luong_hien_tai = nhan_su_row.get("KhoiLuongHienTai") or 0
+    # khoi_luong_toi_da = nhan_su_row.get("KhoiLuongToiDa") or 1
+    def numeric_or_default(value, default):
+        return default if value is None or pd.isna(value) else value
+
+    so_nam_kinh_nghiem = numeric_or_default(nhan_su_row.get("SoNamKinhNghiem"), 0)
+    khoi_luong_hien_tai = numeric_or_default(nhan_su_row.get("KhoiLuongHienTai"), 0)
+    khoi_luong_toi_da = numeric_or_default(nhan_su_row.get("KhoiLuongToiDa"), 1)
+
 
     exp_score = min(so_nam_kinh_nghiem / 10, 1.0) * (0.5 + do_phuc_tap * 0.5)
     phan_tram_tai = khoi_luong_hien_tai / khoi_luong_toi_da if khoi_luong_toi_da else 1

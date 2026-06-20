@@ -29,10 +29,22 @@ def build_graph() -> nx.DiGraph:
             nhan_diem_nghen=row.get("Nhan_GhiNhanDiemNghen"),
         )
 
+    # for _, row in phu_thuoc_df.iterrows():
+    #     truoc, sau = row["MaCongViecTruoc"], row["MaCongViecSau"]
+    #     if truoc in G.nodes and sau in G.nodes:
+    #         G.add_edge(truoc, sau, loai_phu_thuoc=row.get("LoaiPhuThuoc"))
     for _, row in phu_thuoc_df.iterrows():
         truoc, sau = row["MaCongViecTruoc"], row["MaCongViecSau"]
-        if truoc in G.nodes and sau in G.nodes:
-            G.add_edge(truoc, sau, loai_phu_thuoc=row.get("LoaiPhuThuoc"))
+        for node in (truoc, sau):
+            if node not in G.nodes:
+                G.add_node(
+                    node,
+                    trang_thai=None,
+                    so_gio_uoc_tinh=None,
+                    nhan_diem_nghen=None,
+                )
+        G.add_edge(truoc, sau, loai_phu_thuoc=row.get("LoaiPhuThuoc"))
+
 
     return G
 

@@ -23,6 +23,8 @@ DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 18 for SQL Server")
 DB_TRUSTED_CONNECTION = os.getenv("DB_TRUSTED_CONNECTION", "yes")  # yes = Windows Authentication
 DB_USERNAME = os.getenv("DB_USERNAME", "")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_TRUST_SERVER_CERTIFICATE = os.getenv("DB_TRUST_SERVER_CERTIFICATE", "no")
+
 
 
 def get_connection_string() -> str:
@@ -44,9 +46,8 @@ def get_connection_string() -> str:
         # Windows Authentication (mặc định khi chạy local)
         base += "Trusted_Connection=yes;"
 
-    # Cần thiết với Driver 18 khi connect tới SQL Server local (self-signed cert)
-    base += "TrustServerCertificate=yes;"
-
+    # Chỉ bật cho môi trường local/dev khi thật sự cần
+    base += f"TrustServerCertificate={DB_TRUST_SERVER_CERTIFICATE};"
     return base
 
 

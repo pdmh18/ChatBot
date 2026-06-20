@@ -1,5 +1,5 @@
 """Routes liên quan đến dự báo rủi ro & tối ưu nguồn lực."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from src.api.schemas import (
     TaskRiskRequest, TaskRiskResponse,
     StaffMatchRequest, StaffMatchResult,
@@ -32,7 +32,7 @@ def match_staff(req: StaffMatchRequest):
 
 
 @router.get("/analyze-bottleneck", response_model=list[BottleneckResult])
-def analyze_bottleneck(top_n: int = 10):
+def analyze_bottleneck(top_n: int = Query(10, ge=1, le=100)):
     """Phân tích đồ thị phụ thuộc công việc (PhuThuocCongViec), tìm điểm nghẽn dự án."""
     G = build_graph()
     return detect_bottlenecks(G, top_n=top_n)
