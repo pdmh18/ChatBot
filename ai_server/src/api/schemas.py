@@ -4,10 +4,11 @@ from typing import Optional
 
 
 class TaskRiskRequest(BaseModel):
-    story_point: float = Field(..., ge=0, description="Độ lớn công việc (1,2,3,5,8,13)")
-    do_phuc_tap: float = Field(..., ge=0, le=1, description="Độ phức tạp (0-1)")
-    so_nguoi_phu_thuoc: float = Field(..., ge=0, description="Số task phụ thuộc")
-    kinh_nghiem_nguoi_lam: float = Field(..., ge=0, le=10, description="Số năm kinh nghiệm")
+    SoGioUocTinh: float = Field(..., ge=0, description="Số giờ ước tính hoàn thành task")
+    SoNamKinhNghiemNhanSu: float = Field(..., ge=0, le=50, description="Số năm kinh nghiệm người phụ trách")
+    KhoiLuongHienTaiNhanSu: float = Field(..., ge=0, description="Khối lượng công việc hiện tại của nhân sự")
+    SoCongViecPhuThuocTruoc: int = Field(..., ge=0, description="Số task phải hoàn thành trước task này")
+    DoUuTien_Encoded: int = Field(..., ge=0, le=3, description="Độ ưu tiên đã mã hóa: 0=Thấp,1=Trung bình,2=Cao,3=Khẩn cấp")
 
 
 class TaskRiskResponse(BaseModel):
@@ -17,18 +18,20 @@ class TaskRiskResponse(BaseModel):
 
 
 class StaffMatchRequest(BaseModel):
-    ky_nang_yeu_cau: str
-    do_phuc_tap: float = Field(..., ge=0, le=1)
-    top_n: int = 5
+    do_phuc_tap: float = Field(0.5, ge=0, le=1, description="Độ phức tạp ước lượng của task (0-1)")
+    top_n: int = Field(5, ge=1, le=100, description="Số lượng nhân sự phù hợp nhất cần trả về")
 
 
 class StaffMatchResult(BaseModel):
-    nhan_su_id: str
+    MaNguoiDung: int
+    HoTen: str
     diem_phu_hop: float
+    phan_tram_tai_hien_tai: float
 
 
 class BottleneckResult(BaseModel):
-    task_id: str
+    MaCongViec: int
+    trang_thai: Optional[str] = None
     so_task_phu_thuoc_vao_no: int
     diem_trung_tam: float
     diem_bottleneck: float

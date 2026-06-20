@@ -1,0 +1,196 @@
+﻿<h2>Tasks</h2>
+
+@if (successMessage) {
+  <div class="success-message">{{ successMessage }}</div>
+}
+
+<div class="toolbar">
+  <input
+    type="text"
+    placeholder="Tìm task..."
+    [(ngModel)]="searchText"
+  />
+
+  <select [(ngModel)]="statusFilter">
+    <option value="All">Tất cả trạng thái</option>
+    <option value="Todo">Todo</option>
+    <option value="In Progress">In Progress</option>
+    <option value="Review">Review</option>
+    <option value="Done">Done</option>
+  </select>
+
+  <select [(ngModel)]="priorityFilter">
+    <option value="All">Tất cả ưu tiên</option>
+    <option value="High">High</option>
+    <option value="Medium">Medium</option>
+    <option value="Low">Low</option>
+  </select>
+
+  <button type="button" class="add-btn" (click)="openAddTask()">
+    + Thêm task
+  </button>
+</div>
+
+<table class="task-table">
+  <thead>
+    <tr>
+      <th>Tên task</th>
+      <th>Dự án</th>
+      <th>Sprint</th>
+      <th>Người phụ trách</th>
+      <th>Trạng thái</th>
+      <th>Ưu tiên</th>
+      <th>Deadline</th>
+      <th>Risk AI</th>
+      <th>Hành động</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    @for (task of filteredTasks; track task.id) {
+      <tr>
+        <td>{{ task.name }}</td>
+        <td>{{ task.project }}</td>
+        <td>{{ task.sprint }}</td>
+        <td>{{ task.assignee }}</td>
+        <td>{{ task.status }}</td>
+        <td>{{ task.priority }}</td>
+        <td>{{ task.deadline }}</td>
+        <td>{{ task.riskScore }}%</td>
+        <td>
+          <button type="button" (click)="selectTask(task)">Xem</button>
+          <button type="button" (click)="showAiSuggestion(task)">Gợi ý AI</button>
+        </td>
+      </tr>
+    }
+  </tbody>
+</table>
+
+@if (selectedTask) {
+  <div class="task-detail">
+    <h3>Chi tiết task</h3>
+
+    <p><b>Tên task:</b> {{ selectedTask.name }}</p>
+    <p><b>Dự án:</b> {{ selectedTask.project }}</p>
+    <p><b>Sprint:</b> {{ selectedTask.sprint }}</p>
+    <p><b>Người phụ trách:</b> {{ selectedTask.assignee }}</p>
+    <p><b>Trạng thái:</b> {{ selectedTask.status }}</p>
+    <p><b>Ưu tiên:</b> {{ selectedTask.priority }}</p>
+    <p><b>Deadline:</b> {{ selectedTask.deadline }}</p>
+    <p><b>Risk AI:</b> {{ selectedTask.riskScore }}%</p>
+  </div>
+}
+
+@if (suggestionTask) {
+  <div class="modal-backdrop">
+    <div class="modal">
+      <header class="modal-header">
+        <div>
+          <h3>Gợi ý giao việc</h3>
+          <p>{{ suggestionTask.name }}</p>
+        </div>
+
+        <button type="button" (click)="closeSuggestion()">X</button>
+      </header>
+
+      <div class="developer-list">
+        @for (developer of suggestedDevelopers; track developer.id) {
+          <div class="developer-card">
+            <div>
+              <strong>{{ developer.name }}</strong>
+              <p>{{ developer.reason }}</p>
+            </div>
+
+            <div class="developer-score">
+              <span>{{ developer.score }}%</span>
+              <small>Workload {{ developer.workload }}%</small>
+            </div>
+
+            <button type="button" (click)="assignDeveloper(developer)">
+              Chọn
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (isAddTaskOpen) {
+  <div class="modal-backdrop">
+    <div class="modal">
+      <header class="modal-header">
+        <div>
+          <h3>Thêm task</h3>
+          <p>Tạo task mới bằng dữ liệu mock</p>
+        </div>
+
+        <button type="button" (click)="closeAddTask()">X</button>
+      </header>
+
+      <div class="task-form">
+        @if (formMessage) {
+          <div class="form-error">{{ formMessage }}</div>
+        }
+
+        <label>
+          Tên task
+          <input type="text" [(ngModel)]="newTask.name" maxlength="80" />
+        </label>
+
+        <label>
+          Sprint
+          <select [(ngModel)]="newTask.sprint">
+            <option value="Sprint 1">Sprint 1</option>
+            <option value="Sprint 2">Sprint 2</option>
+            <option value="Sprint 3">Sprint 3</option>
+          </select>
+        </label>
+
+        <label>
+          Người phụ trách
+          <input type="text" [(ngModel)]="newTask.assignee" />
+        </label>
+
+        <label>
+          Trạng thái
+          <select [(ngModel)]="newTask.status">
+            <option value="Todo">Todo</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Review">Review</option>
+            <option value="Done">Done</option>
+          </select>
+        </label>
+
+        <label>
+          Ưu tiên
+          <select [(ngModel)]="newTask.priority">
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </label>
+
+        <label>
+          Deadline
+          <input type="date" [(ngModel)]="newTask.deadline" />
+        </label>
+
+        <label>
+          Risk AI
+          <input type="number" min="0" max="100" [(ngModel)]="newTask.riskScore" />
+        </label>
+      </div>
+
+      <footer class="modal-actions">
+        <button type="button" class="secondary-btn" (click)="closeAddTask()">
+          Hủy
+        </button>
+
+        <button type="button" class="primary-btn" (click)="addTask()">
+          Lưu task
+        </button>
+      </footer>
+    </div>
+  </div>
+}

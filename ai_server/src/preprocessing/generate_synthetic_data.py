@@ -1,97 +1,117 @@
 """
-Sinh dữ liệu giả lập (synthetic) cho 3 bảng:
-- nhan_su (developers)
-- cong_viec (tasks)
-- phu_thuoc_cong_viec (task dependencies) -> dùng cho GNN
+Kết nối SQL Server (QuanLyDuAn_AI) và đọc dữ liệu từ 3 view có sẵn:
+- v_Dataset_DuBaoTreHan        -> dùng cho model dự báo trễ hạn (XGBoost)
+- v_Dataset_DeXuatGiaoViec     -> dùng cho model đề xuất giao việc
+- v_Dataset_PhatHienDiemNghen  -> dùng cho model phát hiện điểm nghẽn (GNN/graph)
 
-Chạy: python -m src.preprocessing.generate_synthetic_data
+Ngoài ra còn hàm đọc bảng PhuThuocCongViec để dựng đồ thị (graph) phụ thuộc.
+
+Yêu cầu: đã cài ODBC Driver 17 hoặc 18 for SQL Server.
+Kiểm tra: powershell -> Get-OdbcDriver | Where-Object {$_.Name -like "*SQL Server*"}
 """
-import numpy as np
+import os
 import pandas as pd
-from pathlib import Path
+import pyodbc
+from dotenv import load_dotenv
 
-np.random.seed(42)
+load_dotenv()
 
-RAW_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "raw"
-RAW_DIR.mkdir(parents=True, exist_ok=True)
-
-SKILLS = ["Backend", "Frontend", "DevOps", "AI/ML", "QA", "Mobile"]
-
-
-def generate_nhan_su(n=20) -> pd.DataFrame:
-    """Bảng nhân sự: năng lực, khối lượng công việc hiện tại."""
-    rows = []
-    for i in range(n):
-        rows.append({
-            "nhan_su_id": f"NS{i+1:03d}",
-            "ten": f"Developer_{i+1}",
-            "ky_nang_chinh": np.random.choice(SKILLS),
-            "nam_kinh_nghiem": np.random.randint(0, 10),
-            "diem_hieu_suat": round(np.random.uniform(0.5, 1.0), 2),  # historical performance score
-            "so_task_dang_lam": np.random.randint(0, 6),  # current workload
-        })
-    return pd.DataFrame(rows)
+# Đọc cấu hình từ .env (xem .env.example để biết format)
+DB_SERVER = os.getenv("DB_SERVER", r"localhost\SQLEXPRESS")
+DB_NAME = os.getenv("DB_NAME", "QuanLyDuAn_AI")
+DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 18 for SQL Server")
+DB_TRUSTED_CONNECTION = os.getenv("DB_TRUSTED_CONNECTION", "yes")  # yes = Windows Authentication
+DB_USERNAME = os.getenv("DB_USERNAME", "")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_TRUST_SERVER_CERTIFICATE = os.getenv("DB_TRUST_SERVER_CERTIFICATE", "no")
 
 
-def generate_cong_viec(n=80, nhan_su_ids=None) -> pd.DataFrame:
-    """Bảng công việc: thông tin task + nhãn trễ hạn (label để train)."""
-    rows = []
-    for i in range(n):
-        story_point = np.random.choice([1, 2, 3, 5, 8, 13])
-        do_phuc_tap = np.random.uniform(0.1, 1.0)
-        so_nguoi_phu_thuoc = np.random.randint(0, 4)
-        kinh_nghiem_nguoi_lam = np.random.uniform(0, 10)
 
-        # luật giả lập để tạo nhãn "trễ hạn" có ý nghĩa thống kê (không hoàn toàn random)
-        risk_score = (
-            0.35 * (story_point / 13)
-            + 0.25 * do_phuc_tap
-            + 0.20 * (so_nguoi_phu_thuoc / 3)
-            - 0.20 * (kinh_nghiem_nguoi_lam / 10)
-        )
-        bi_tre_han = 1 if risk_score + np.random.normal(0, 0.1) > 0.45 else 0
-
-        rows.append({
-            "task_id": f"TASK{i+1:04d}",
-            "ten_task": f"Task {i+1}",
-            "story_point": story_point,
-            "do_phuc_tap": round(do_phuc_tap, 2),
-            "so_nguoi_phu_thuoc": so_nguoi_phu_thuoc,
-            "kinh_nghiem_nguoi_lam": round(kinh_nghiem_nguoi_lam, 2),
-            "nhan_su_id": np.random.choice(nhan_su_ids) if nhan_su_ids is not None else None,
-            "bi_tre_han": bi_tre_han,  # label: 1 = trễ, 0 = đúng hạn
-        })
-    return pd.DataFrame(rows)
-
-
-def generate_phu_thuoc_cong_viec(task_ids, n_edges=60) -> pd.DataFrame:
+def get_connection_string() -> str:
     """
-    Bảng phụ thuộc công việc: task A phải xong trước task B mới được làm.
-    Dùng để xây đồ thị (graph) cho GNN tìm bottleneck.
+    Tạo connection string. Tự động chọn giữa Windows Authentication
+    (mặc định, không cần user/pass) và SQL Server Authentication
+    (nếu .env có khai báo DB_USERNAME + DB_PASSWORD).
     """
-    edges = set()
-    while len(edges) < n_edges:
-        a, b = np.random.choice(task_ids, 2, replace=False)
-        edges.add((a, b))
+    base = (
+        f"DRIVER={{{DB_DRIVER}}};"
+        f"SERVER={DB_SERVER};"
+        f"DATABASE={DB_NAME};"
+    )
 
-    rows = [{"task_truoc": a, "task_sau": b} for a, b in edges]
-    return pd.DataFrame(rows)
+    if DB_USERNAME and DB_PASSWORD:
+        # SQL Server Authentication
+        base += f"UID={DB_USERNAME};PWD={DB_PASSWORD};"
+    else:
+        # Windows Authentication (mặc định khi chạy local)
+        base += "Trusted_Connection=yes;"
+
+    # Chỉ bật cho môi trường local/dev khi thật sự cần
+    base += f"TrustServerCertificate={DB_TRUST_SERVER_CERTIFICATE};"
+    return base
 
 
-def main():
-    nhan_su_df = generate_nhan_su(n=20)
-    cong_viec_df = generate_cong_viec(n=80, nhan_su_ids=nhan_su_df["nhan_su_id"].tolist())
-    phu_thuoc_df = generate_phu_thuoc_cong_viec(cong_viec_df["task_id"].tolist(), n_edges=60)
+def get_connection() -> pyodbc.Connection:
+    """Mở 1 connection mới tới SQL Server."""
+    conn_str = get_connection_string()
+    return pyodbc.connect(conn_str)
 
-    nhan_su_df.to_csv(RAW_DIR / "nhan_su.csv", index=False)
-    cong_viec_df.to_csv(RAW_DIR / "cong_viec.csv", index=False)
-    phu_thuoc_df.to_csv(RAW_DIR / "phu_thuoc_cong_viec.csv", index=False)
 
-    print(f" Đã sinh dữ liệu giả lập tại: {RAW_DIR}")
-    print(f"   - nhan_su.csv: {len(nhan_su_df)} dòng")
-    print(f"   - cong_viec.csv: {len(cong_viec_df)} dòng")
-    print(f"   - phu_thuoc_cong_viec.csv: {len(phu_thuoc_df)} dòng")
+def query_to_dataframe(sql: str) -> pd.DataFrame:
+    """Chạy 1 câu SQL bất kỳ, trả về pandas DataFrame."""
+    with get_connection() as conn:
+        return pd.read_sql(sql, conn)
+
+
+# ===== Các hàm đọc đúng 3 view đã có sẵn trong DB =====
+
+def load_dataset_du_bao_tre_han() -> pd.DataFrame:
+    """Đọc view v_Dataset_DuBaoTreHan - dùng để train XGBoost dự báo trễ hạn."""
+    return query_to_dataframe("SELECT * FROM v_Dataset_DuBaoTreHan")
+
+
+def load_dataset_de_xuat_giao_viec() -> pd.DataFrame:
+    """Đọc view v_Dataset_DeXuatGiaoViec - dùng để train model đề xuất giao việc."""
+    return query_to_dataframe("SELECT * FROM v_Dataset_DeXuatGiaoViec")
+
+
+def load_dataset_phat_hien_diem_nghen() -> pd.DataFrame:
+    """Đọc view v_Dataset_PhatHienDiemNghen - dùng cho model phát hiện điểm nghẽn."""
+    return query_to_dataframe("SELECT * FROM v_Dataset_PhatHienDiemNghen")
+
+
+def load_phu_thuoc_cong_viec() -> pd.DataFrame:
+    """
+    Đọc bảng PhuThuocCongViec (quan hệ phụ thuộc giữa các task)
+    Dùng để dựng đồ thị (graph) cho bottleneck_detector.py
+    """
+    return query_to_dataframe("""
+        SELECT MaCongViecTruoc, MaCongViecSau, LoaiPhuThuoc
+        FROM PhuThuocCongViec
+    """)
+
+
+def load_nguoi_dung() -> pd.DataFrame:
+    """Đọc bảng NguoiDung (nhân sự) - dùng cho staff_matching.py"""
+    return query_to_dataframe("""
+        SELECT MaNguoiDung, HoTen, MaVaiTro, SoNamKinhNghiem,
+               KhoiLuongHienTai, KhoiLuongToiDa, DangHoatDong
+        FROM NguoiDung
+        WHERE DangHoatDong = 1
+    """)
+
+
+def load_cong_viec() -> pd.DataFrame:
+    """Đọc bảng CongViec đầy đủ (không qua view) - dùng khi cần thêm cột gốc."""
+    return query_to_dataframe("SELECT * FROM CongViec")
 
 
 if __name__ == "__main__":
-    main()
+    # Test nhanh kết nối
+    print(f"Đang kết nối tới: {DB_SERVER} / DB: {DB_NAME}")
+    try:
+        df = load_dataset_du_bao_tre_han()
+        print(f"✅ Kết nối thành công! v_Dataset_DuBaoTreHan: {len(df)} dòng")
+        print(df.head())
+    except Exception as e:
+        print(f"❌ Lỗi kết nối: {e}")

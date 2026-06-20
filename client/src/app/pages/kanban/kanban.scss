@@ -1,0 +1,96 @@
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.kanban-column {
+  background: #f1f5f9;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.kanban-column h3 {
+  margin: 0 0 12px;
+}
+
+.task-list {
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-card {
+  padding: 12px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #ddd;
+  cursor: grab;
+}
+
+.task-card:active {
+  cursor: grabbing;
+}
+
+.task-title {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.task-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #667085;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.task-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.priority,
+.risk {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.priority.high {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.priority.medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.priority.low {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.risk {
+  background: #eef2ff;
+  color: #2563eb;
+}
+
+.risk.risky {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.cdk-drag-preview {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.3;
+}

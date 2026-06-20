@@ -1,0 +1,67 @@
+﻿<h2>AI Alerts</h2>
+
+<section class="alert-section">
+  <h3>Dự báo task trễ hạn</h3>
+
+  @for (item of lateRisks; track item.id) {
+    <div class="alert-card danger">
+      <strong>{{ item.task }}</strong>
+      <p>Nguy cơ trễ hạn: {{ item.risk }}%</p>
+      <small>{{ item.reason }}</small>
+    </div>
+  }
+</section>
+
+<section class="alert-section">
+  <h3>Phát hiện điểm nghẽn</h3>
+
+  @for (item of bottlenecks; track item.id) {
+    <button type="button" class="alert-card warning" (click)="openBottleneckAlert(item)">
+      <strong>{{ item.task }}</strong>
+      <p>Đang chặn {{ item.blockedTasks }} task khác</p>
+    </button>
+  }
+</section>
+
+<section class="alert-section">
+  <h3>Gợi ý giao việc</h3>
+
+  @for (item of suggestions; track item.id) {
+    <div class="alert-card success">
+      <strong>{{ item.task }}</strong>
+      <p>Nên giao cho: {{ item.developer }}</p>
+      <small>Độ phù hợp: {{ item.score }}%</small>
+    </div>
+  }
+</section>
+
+@if (selectedBottleneck) {
+  <div class="modal-backdrop">
+    <div class="modal">
+      <header class="modal-header warning-header">
+        <div>
+          <h3>Cảnh báo điểm nghẽn</h3>
+          <p>{{ selectedBottleneck.task }}</p>
+        </div>
+
+        <button type="button" (click)="closeBottleneckAlert()">X</button>
+      </header>
+
+      <div class="modal-body">
+        <p>
+          Task này đang chặn
+          <strong>{{ selectedBottleneck.blockedTasks }}</strong>
+          task khác trong dự án.
+        </p>
+
+        <p>
+          AI đề xuất PM ưu tiên xử lý task này trước để tránh ảnh hưởng tiến độ sprint.
+        </p>
+
+        <button type="button" (click)="closeBottleneckAlert()">
+          Đã hiểu
+        </button>
+      </div>
+    </div>
+  </div>
+}
