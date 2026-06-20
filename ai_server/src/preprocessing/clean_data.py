@@ -43,7 +43,7 @@ RISK_FEATURE_COLS = [
     "SoNamKinhNghiemNhanSu",
     "KhoiLuongHienTaiNhanSu",
     "SoCongViecPhuThuocTruoc",
-    "DoUuTien_Encoded",
+    "SoNgayDuKien",
 ]
 RISK_LABEL_COL = "Nhan_CoTreHan"
 
@@ -154,7 +154,7 @@ def tao_preprocessing_pipeline(smote_k_neighbors=5):
     """
     pipeline = Pipeline([
         ('scaler', MinMaxScaler()),
-        ('smote',  SMOTE(random_state=42, k_neighbors=smote_k_neighbors)),
+        # ('smote',  SMOTE(random_state=42, k_neighbors=smote_k_neighbors)),
 
     ])
     return pipeline
@@ -198,11 +198,13 @@ def chay_pipeline(df, feature_cols, label_col, pipeline_name, test_size=0.2):
 
     # FIT PIPELINE TRÊN TRAIN
     pipeline = tao_preprocessing_pipeline(smote_k_neighbors=smote_k)
-    X_train_processed, y_train_processed = pipeline.fit_resample(X_train, y_train)
+    # X_train_processed, y_train_processed = pipeline.fit_resample(X_train, y_train)
+    X_train_processed = pipeline.fit_transform(X_train)
+    y_train_processed = y_train.values
 
-    print(f"   Trước SMOTE: {dict(y_train.value_counts())}")
-    print(f"   Sau SMOTE:   {dict(pd.Series(y_train_processed).value_counts())}")
-    print(f"   Train sau SMOTE: {len(X_train_processed)} dòng")
+    # print(f"   Trước SMOTE: {dict(y_train.value_counts())}")
+    # print(f"   Sau SMOTE:   {dict(pd.Series(y_train_processed).value_counts())}")
+    # print(f"   Train sau SMOTE: {len(X_train_processed)} dòng")
 
     # TRANSFORM TEST — chỉ dùng scaler, không SMOTE
     scaler     = pipeline.named_steps['scaler']
@@ -247,7 +249,7 @@ def main():
     print(f"   Raw: {len(risk_df)} dòng")
 
     risk_df = lam_sach_co_ban(risk_df, "MaCongViec", RISK_LABEL_COL)
-    risk_df = encode_do_uu_tien(risk_df)
+    # risk_df = encode_do_uu_tien(risk_df)
     risk_df = lam_giau_khoi_luong(risk_df)
     risk_df = fill_null_features(risk_df, RISK_FEATURE_COLS)
     risk_df = xu_ly_outlier(risk_df, ["SoGioUocTinh", "SoNamKinhNghiemNhanSu"])
