@@ -10,4 +10,13 @@
     <PackageReference Include="MediatR" Version="12.4.1" />
     <PackageReference Include="FluentValidation" Version="11.11.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Common\DTOs\" />
+    <Folder Include="Common\Interfaces\" />
+    <Folder Include="Common\Utils\" />
+    <Folder Include="Features\Auth\Commands\" />
+    <Folder Include="Features\Chat\Commands\" />
+    <Folder Include="Features\Chat\Queries\" />
+    <Folder Include="Features\Project\Queries\" />
+  </ItemGroup>
 </Project>
