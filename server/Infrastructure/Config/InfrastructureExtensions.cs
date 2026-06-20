@@ -1,12 +1,8 @@
+﻿using System;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Application.Common.Interfaces;
-using Application.Config;
-using Domain.Interfaces;
-using Infrastructure.Persistence;
-using Infrastructure.Persistence.Repositories;
-using Infrastructure.Services;
 
 namespace Infrastructure.Config;
 
@@ -14,23 +10,11 @@ public static class InfrastructureExtensions
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        // DbContext
-        services.AddDbContext<QuanLyDuAnAiContext>(opt =>
-    opt.UseSqlServer(config.GetConnectionString("Default")));
+        var connectionString = config.GetConnectionString("Default")
+            ?? throw new InvalidOperationException("Missing connection string 'Default'.");
 
-        // Repositories
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-        // Services
-        services.AddScoped<IJwtService, JwtService>();
-        services.AddScoped<IPasswordService, PasswordService>();
-
-        // AI HttpClient
-        services.AddHttpClient<IAiService, AiService>(client =>
-        {
-            client.BaseAddress = new Uri(config["AiServer:BaseUrl"] ?? "http://localhost:8000");
-            client.Timeout = TimeSpan.FromSeconds(60);
-        });
+        services.AddDbContext<QuanLyDuAnAiContext>(options =>
+            options.UseSqlServer(connectionString));
 
         return services;
     }

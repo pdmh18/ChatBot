@@ -1,8 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Application.Common.Utils;
-using Application.Config;
 using Infrastructure.Config;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,12 +9,7 @@ using WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Settings
-builder.Services.Configure<AppSettings>(builder.Configuration);
 
-// Application
-builder.Services.AddAutoMapper(typeof(MappingProfile));
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(MappingProfile).Assembly));
 
 // Infrastructure
 builder.Services.AddInfrastructure(builder.Configuration);
