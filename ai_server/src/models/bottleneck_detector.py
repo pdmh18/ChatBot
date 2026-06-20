@@ -1,12 +1,10 @@
 """
 Phân tích đồ thị (graph) phụ thuộc công việc để phát hiện điểm nghẽn (bottleneck).
+Dùng dữ liệu thật từ bảng PhuThuocCongViec trong SQL Server.
 
-Ghi chú: Bản này dùng NetworkX + graph centrality metrics (in-degree, betweenness,
-PageRank) làm baseline — đây là cách tiếp cận "graph analysis" cổ điển.
-
-Khi có đủ dữ liệu lịch sử (nhiều dự án, nhãn "đã từng là bottleneck"), có thể nâng
-cấp lên GNN thực sự (PyTorch Geometric / DGL) để học biểu diễn (embedding) node
-và dự đoán xác suất bottleneck thay vì chỉ dùng centrality.
+Ghi chú: Bản này dùng NetworkX + graph centrality metrics (out-degree, betweenness,
+PageRank) làm baseline. Khi có đủ dữ liệu lịch sử (nhãn "đã từng là bottleneck"
+qua nhiều dự án), có thể nâng cấp lên GNN thực sự (PyTorch Geometric / DGL).
 
 Chạy: python -m src.models.bottleneck_detector
 """
@@ -18,22 +16,40 @@ PROCESSED_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "proces
 
 
 def build_graph() -> nx.DiGraph:
-    """Xây đồ thị có hướng: task_truoc -> task_sau."""
+    """Xây đồ thị có hướng: MaCongViecTruoc -> MaCongViecSau."""
     phu_thuoc_df = pd.read_csv(PROCESSED_DIR / "phu_thuoc_clean.csv")
-    cong_viec_df = pd.read_csv(PROCESSED_DIR / "cong_viec_clean.csv")
+    bottleneck_df = pd.read_csv(PROCESSED_DIR / "bottleneck_clean.csv")
 
     G = nx.DiGraph()
-    for _, row in cong_viec_df.iterrows():
-        G.add_node(row["task_id"], story_point=row["story_point"], do_phuc_tap=row["do_phuc_tap"])
+    for _, row in bottleneck_df.iterrows():
+        G.add_node(
+            row["MaCongViec"],
+            trang_thai=row.get("TrangThaiHienTai"),
+            so_gio_uoc_tinh=row.get("SoGioUocTinh"),
+            nhan_diem_nghen=row.get("Nhan_GhiNhanDiemNghen"),
+        )
 
+    # for _, row in phu_thuoc_df.iterrows():
+    #     truoc, sau = row["MaCongViecTruoc"], row["MaCongViecSau"]
+    #     if truoc in G.nodes and sau in G.nodes:
+    #         G.add_edge(truoc, sau, loai_phu_thuoc=row.get("LoaiPhuThuoc"))
     for _, row in phu_thuoc_df.iterrows():
-        if row["task_truoc"] in G.nodes and row["task_sau"] in G.nodes:
-            G.add_edge(row["task_truoc"], row["task_sau"])
+        truoc, sau = row["MaCongViecTruoc"], row["MaCongViecSau"]
+        for node in (truoc, sau):
+            if node not in G.nodes:
+                G.add_node(
+                    node,
+                    trang_thai=None,
+                    so_gio_uoc_tinh=None,
+                    nhan_diem_nghen=None,
+                )
+        G.add_edge(truoc, sau, loai_phu_thuoc=row.get("LoaiPhuThuoc"))
+
 
     return G
 
 
-def detect_bottlenecks(G: nx.DiGraph, top_n: int = 5) -> list:
+def detect_bottlenecks(G: nx.DiGraph, top_n: int = 10) -> list:
     """
     Phát hiện điểm nghẽn dựa trên 3 chỉ số:
     - out_degree cao: task này chặn nhiều task khác
@@ -46,16 +62,18 @@ def detect_bottlenecks(G: nx.DiGraph, top_n: int = 5) -> list:
     out_degree = dict(G.out_degree())
     betweenness = nx.betweenness_centrality(G)
     pagerank = nx.pagerank(G) if G.number_of_edges() > 0 else {n: 0 for n in G.nodes}
+    max_out_degree = max(out_degree.values(), default=1) or 1
 
     results = []
     for node in G.nodes:
         bottleneck_score = (
-            0.4 * (out_degree.get(node, 0) / max(out_degree.values(), default=1))
+            0.4 * (out_degree.get(node, 0) / max_out_degree)
             + 0.35 * betweenness.get(node, 0)
             + 0.25 * pagerank.get(node, 0)
         )
         results.append({
-            "task_id": node,
+            "MaCongViec": int(node),
+            "trang_thai": G.nodes[node].get("trang_thai"),
             "so_task_phu_thuoc_vao_no": out_degree.get(node, 0),
             "diem_trung_tam": round(betweenness.get(node, 0), 4),
             "diem_bottleneck": round(bottleneck_score * 100, 2),
@@ -66,12 +84,11 @@ def detect_bottlenecks(G: nx.DiGraph, top_n: int = 5) -> list:
 
 
 def find_critical_path(G: nx.DiGraph) -> list:
-    """Tìm đường đi dài nhất (critical path) trong đồ thị — chuỗi task quyết định tiến độ."""
+    """Tìm đường đi dài nhất (critical path) - chuỗi task quyết định tiến độ."""
     if not nx.is_directed_acyclic_graph(G):
         return []  # có vòng lặp -> dữ liệu phụ thuộc bị lỗi logic
-
     longest_path = nx.dag_longest_path(G)
-    return longest_path
+    return [int(n) for n in longest_path]
 
 
 if __name__ == "__main__":
