@@ -56,6 +56,8 @@ public partial class QuanLyDuAnAiContext : DbContext
 
     public virtual DbSet<PhuThuocCongViec> PhuThuocCongViecs { get; set; }
 
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
     public virtual DbSet<RuiRoDuAn> RuiRoDuAns { get; set; }
 
     public virtual DbSet<RuiRoNghiemTrong> RuiRoNghiemTrongs { get; set; }
@@ -169,6 +171,8 @@ public partial class QuanLyDuAnAiContext : DbContext
 
             entity.HasIndex(e => e.MaNguoiPhuTrach, "IDX_CongViec_MaNguoiPhuTrach");
 
+            entity.HasIndex(e => e.MaSprint, "IDX_CongViec_MaSprint");
+
             entity.HasIndex(e => e.TrangThai, "IDX_CongViec_TrangThai");
 
             entity.HasIndex(e => e.MaCongViecCode, "UQ__CongViec__F8C0C5AF526E075C").IsUnique();
@@ -216,6 +220,10 @@ public partial class QuanLyDuAnAiContext : DbContext
             entity.HasKey(e => e.MaDanhGia).HasName("PK__DanhGiaH__AA9515BFE636FEC7");
 
             entity.ToTable("DanhGiaHieuSuatCongViec");
+
+            entity.HasIndex(e => e.MaCongViec, "IDX_DanhGiaHieuSuat_MaCongViec");
+
+            entity.HasIndex(e => e.MaNguoiDuocDanhGia, "IDX_DanhGiaHieuSuat_MaNguoiDuocDanhGia");
 
             entity.HasIndex(e => e.MaCongViec, "UQ__DanhGiaH__41B7DD19AF3A49EA").IsUnique();
 
@@ -518,6 +526,7 @@ public partial class QuanLyDuAnAiContext : DbContext
             entity.Property(e => e.NgayTao)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
+            entity.Property(e => e.Password).HasMaxLength(255);
             entity.Property(e => e.SoDienThoai).HasMaxLength(20);
             entity.Property(e => e.SoNamKinhNghiem).HasDefaultValue(0);
 
@@ -536,6 +545,8 @@ public partial class QuanLyDuAnAiContext : DbContext
             entity.HasIndex(e => e.MaCongViec, "IDX_NhatKyLamViec_MaCongViec");
 
             entity.HasIndex(e => e.MaNguoiDung, "IDX_NhatKyLamViec_MaNguoiDung");
+
+            entity.HasIndex(e => e.NgayLamViec, "IDX_NhatKyLamViec_NgayLamViec");
 
             entity.Property(e => e.NgayLamViec).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.NgayTao)
@@ -559,6 +570,10 @@ public partial class QuanLyDuAnAiContext : DbContext
 
             entity.ToTable("PhuThuocCongViec");
 
+            entity.HasIndex(e => e.MaCongViecSau, "IDX_PhuThuoc_CongViecSau");
+
+            entity.HasIndex(e => e.MaCongViecTruoc, "IDX_PhuThuoc_CongViecTruoc");
+
             entity.Property(e => e.LoaiPhuThuoc)
                 .HasMaxLength(50)
                 .IsUnicode(false)
@@ -576,6 +591,20 @@ public partial class QuanLyDuAnAiContext : DbContext
                 .HasForeignKey(d => d.MaCongViecTruoc)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__PhuThuocC__MaCon__6AEFE058");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("RefreshToken");
+
+            entity.Property(e => e.RefreshToken1)
+                .HasMaxLength(255)
+                .HasColumnName("RefreshToken");
+            entity.Property(e => e.ThoiGianHetHan).HasPrecision(0);
+
+            entity.HasOne(d => d.MaNguoiDungNavigation).WithMany(p => p.RefreshTokens)
+                .HasForeignKey(d => d.MaNguoiDung)
+                .HasConstraintName("FK_RefreshToken_NguoiDung");
         });
 
         modelBuilder.Entity<RuiRoDuAn>(entity =>
@@ -628,6 +657,8 @@ public partial class QuanLyDuAnAiContext : DbContext
 
             entity.ToTable("SnapshotTienDoDuAn");
 
+            entity.HasIndex(e => new { e.MaDuAn, e.NgayGhiNhan }, "IDX_Snapshot_MaDuAn_Ngay");
+
             entity.HasIndex(e => new { e.MaDuAn, e.NgayGhiNhan }, "UQ_Snapshot_DuAn_Ngay").IsUnique();
 
             entity.Property(e => e.NgayGhiNhan).HasDefaultValueSql("(CONVERT([date],getdate()))");
@@ -656,6 +687,8 @@ public partial class QuanLyDuAnAiContext : DbContext
             entity.HasKey(e => e.MaSprint).HasName("PK__Sprint__FE261DCDB1587062");
 
             entity.ToTable("Sprint");
+
+            entity.HasIndex(e => e.MaDuAn, "IDX_Sprint_MaDuAn");
 
             entity.Property(e => e.NgayTao)
                 .HasDefaultValueSql("(getdate())")

@@ -27,6 +27,8 @@ public partial class NguoiDung
 
     public decimal? MucLuongTheoGio { get; set; }
 
+    public string? Password { get; set; }
+
     public virtual ICollection<ChecklistCongViec> ChecklistCongViecs { get; set; } = new List<ChecklistCongViec>();
 
     public virtual ICollection<CongViec> CongViecMaNguoiPhuTrachNavigations { get; set; } = new List<CongViec>();
@@ -52,6 +54,8 @@ public partial class NguoiDung
     public virtual VaiTro MaVaiTroNavigation { get; set; } = null!;
 
     public virtual ICollection<NhatKyLamViec> NhatKyLamViecs { get; set; } = new List<NhatKyLamViec>();
+
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 
     public virtual ICollection<TaiLieu> TaiLieus { get; set; } = new List<TaiLieu>();
 
