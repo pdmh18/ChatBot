@@ -1,21 +1,23 @@
-using System.Text;
+﻿using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Infrastructure.Config;
-using Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using WebApi.Extensions;
 using WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
-
-
-
 // Infrastructure
 builder.Services.AddInfrastructure(builder.Configuration);
+// JWT Configuration
+var jwtKey = GetRequiredConfig(builder.Configuration, "Jwt:SecretKey");
+var jwtIssuer = GetRequiredConfig(builder.Configuration, "Jwt:Issuer");
+var jwtAudience = GetRequiredConfig(builder.Configuration, "Jwt:Audience");
 
-// Auth
-var jwtKey = builder.Configuration["Jwt:SecretKey"]!;
+if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException("JWT secret key must be at least 32 bytes.");
+}
+// Authentication - JWT Bearer
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {
@@ -23,33 +25,55 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ValidateIssuer = false,
-            ValidateAudience = false,
+
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+
+            ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };
     });
 
 builder.Services.AddAuthorization();
+// Controllers + Swagger
 builder.Services.AddControllers();
 builder.Services.AddSwaggerWithJwt();
-
 // CORS
-builder.Services.AddCors(opt => opt.AddPolicy("AllowAll", p =>
-    p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+// Không dùng AllowAnyOrigin cho kiểu doanh nghiệp.
+// Chỉ cho phép origin được cấu hình trong appsettings/user-secrets/env.
+// Hiện tại Angular chạy ở http://localhost:4200.
+var allowedOrigins = builder.Configuration
+    .GetSection("AllowedOrigins")
+    .GetChildren()
+    .Select(x => x.Value)
+    .Where(x => !string.IsNullOrWhiteSpace(x))
+    .ToArray();
+
+if (allowedOrigins.Length == 0)
+{
+    throw new InvalidOperationException("Missing AllowedOrigins configuration.");
+}
+
+builder.Services.AddCors(opt =>
+{
+    opt.AddPolicy("ClientApp", p =>
+    {
+        p.WithOrigins(allowedOrigins!)
+         .AllowAnyMethod()
+         .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
-// d�ng db first
-// Auto migrate
-//using (var scope = app.Services.CreateScope())
-//{
-//    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-//    await db.Database.MigrateAsync();
-//}
+
+
+// Middleware pipeline
+// ExceptionMiddleware đặt sớm để bắt lỗi toàn cục.
 
 app.UseMiddleware<ExceptionMiddleware>();
-app.UseCors("AllowAll");
-app.UseAuthentication();
-app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
@@ -57,5 +81,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseHttpsRedirection();
+app.UseCors("ClientApp");
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.Run();
+static string GetRequiredConfig(IConfiguration configuration, string key)
+{
+    var value = configuration[key];
+
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        throw new InvalidOperationException($"Missing required configuration: {key}");
+    }
+
+    return value;
+}
