@@ -36,7 +36,7 @@ FEATURE_COLS = [
     "SoNamKinhNghiemNhanSu",
     "KhoiLuongHienTaiNhanSu",
     "SoCongViecPhuThuocTruoc",
-    "SoNgayDuKien",
+    "DoUuTien_Encoded",
 ]
 LABEL_COL = "Nhan_CoTreHan"
 
