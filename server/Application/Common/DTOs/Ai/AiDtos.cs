@@ -98,6 +98,12 @@ namespace Application.Common.DTOs.Ai
         public decimal DiemChatLuongTrungBinh { get; set; }
     }
 
+    public class StaffMatchSaveItemDto
+    {
+        public AiUserDataDto User { get; set; } = null!;
+        public StaffMatchAiResponse AiResult { get; set; } = new();
+    }
+
     // ============================================================
     // DTOs trả về frontend sau khi đã lưu DB
     // ============================================================

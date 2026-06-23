@@ -42,6 +42,11 @@ namespace Application.Features.Ai
             StaffMatchAiResponse aiResult,
             CancellationToken cancellationToken = default);
 
+        Task<IReadOnlyList<StaffMatchResultDto>> ReplaceStaffSuggestionsAsync(
+            AiTaskDataDto task,
+            IReadOnlyList<StaffMatchSaveItemDto> suggestions,
+            CancellationToken cancellationToken = default);
+
         Task<IReadOnlyList<BottleneckResultDto>> SaveBottleneckResultsAsync(
             IReadOnlyList<BottleneckAiResponse> aiResults,
             CancellationToken cancellationToken = default);

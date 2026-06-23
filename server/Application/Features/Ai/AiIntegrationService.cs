@@ -83,26 +83,15 @@ namespace Application.Features.Ai
                 throw new KeyNotFoundException("Không tìm thấy công việc.");
             }
 
-            var user = await _repository.GetUserDataAsync(userId, cancellationToken);
-
-            if (user == null)
-            {
-                throw new KeyNotFoundException("Không tìm thấy nhân sự.");
-            }
-
-            var aiRequest = new StaffMatchAiRequest
-            {
-                SoGioUocTinh = ToDouble(task.SoGioUocTinh),
-                PhanTramTaiNhanSu = ToDouble(user.PhanTramTai),
-                DiemChatLuongTrungBinhLichSu = ToDouble(user.DiemChatLuongTrungBinh)
-            };
-
-            var aiResult = await _aiClient.MatchStaffAsync(aiRequest, cancellationToken);
+            var match = await BuildStaffMatchSaveItemAsync(
+                task,
+                userId,
+                cancellationToken);
 
             return await _repository.SaveStaffMatchAsync(
                 task,
-                user,
-                aiResult,
+                match.User,
+                match.AiResult,
                 cancellationToken);
         }
 
@@ -124,17 +113,26 @@ namespace Application.Features.Ai
                 throw new InvalidOperationException("Dự án chưa có thành viên để đề xuất giao việc.");
             }
 
-            var results = new List<StaffMatchResultDto>();
+            var suggestions = new List<StaffMatchSaveItemDto>();
 
             foreach (var userId in userIds)
             {
-                var result = await MatchStaffAsync(taskId, userId, cancellationToken);
-                results.Add(result);
+                var suggestion = await BuildStaffMatchSaveItemAsync(
+                    task,
+                    userId,
+                    cancellationToken);
+
+                suggestions.Add(suggestion);
             }
 
-            return results
-                .OrderByDescending(x => x.DiemPhuHop)
+            var orderedSuggestions = suggestions
+                .OrderByDescending(x => x.AiResult.XacSuatHieuQua)
                 .ToList();
+
+            return await _repository.ReplaceStaffSuggestionsAsync(
+                task,
+                orderedSuggestions,
+                cancellationToken);
         }
 
         public async Task<IReadOnlyList<BottleneckResultDto>> AnalyzeBottlenecksAsync(
@@ -149,6 +147,34 @@ namespace Application.Features.Ai
             var aiResults = await _aiClient.AnalyzeBottleneckAsync(topN, cancellationToken);
 
             return await _repository.SaveBottleneckResultsAsync(aiResults, cancellationToken);
+        }
+
+        private async Task<StaffMatchSaveItemDto> BuildStaffMatchSaveItemAsync(
+            AiTaskDataDto task,
+            int userId,
+            CancellationToken cancellationToken)
+        {
+            var user = await _repository.GetUserDataAsync(userId, cancellationToken);
+
+            if (user == null)
+            {
+                throw new KeyNotFoundException("Không tìm thấy nhân sự.");
+            }
+
+            var aiRequest = new StaffMatchAiRequest
+            {
+                SoGioUocTinh = ToDouble(task.SoGioUocTinh),
+                PhanTramTaiNhanSu = ToDouble(user.PhanTramTai),
+                DiemChatLuongTrungBinhLichSu = ToDouble(user.DiemChatLuongTrungBinh)
+            };
+
+            var aiResult = await _aiClient.MatchStaffAsync(aiRequest, cancellationToken);
+
+            return new StaffMatchSaveItemDto
+            {
+                User = user,
+                AiResult = aiResult
+            };
         }
 
         private static int EncodePriority(string? priority)

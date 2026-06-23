@@ -12,6 +12,8 @@ namespace Infrastructure.Persistence.Repositories
 {
     public class AiPredictionRepository : IAiPredictionRepository
     {
+        private const string StaffMatchingModelName = "Random Forest Staff Matching";
+
         private readonly QuanLyDuAnAiContext _context;
 
         public AiPredictionRepository(QuanLyDuAnAiContext context)
@@ -103,6 +105,7 @@ namespace Infrastructure.Persistence.Repositories
             CancellationToken cancellationToken = default)
         {
             var existing = await _context.LoaiRuiRos
+                .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.TenLoaiRuiRo == riskTypeName, cancellationToken);
 
             if (existing != null)
@@ -117,9 +120,27 @@ namespace Infrastructure.Persistence.Repositories
             };
 
             _context.LoaiRuiRos.Add(entity);
-            await _context.SaveChangesAsync(cancellationToken);
 
-            return entity.MaLoaiRuiRo;
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                return entity.MaLoaiRuiRo;
+            }
+            catch (DbUpdateException)
+            {
+                _context.Entry(entity).State = EntityState.Detached;
+
+                var existingAfterRace = await _context.LoaiRuiRos
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.TenLoaiRuiRo == riskTypeName, cancellationToken);
+
+                if (existingAfterRace != null)
+                {
+                    return existingAfterRace.MaLoaiRuiRo;
+                }
+
+                throw;
+            }
         }
 
         public async Task<RiskPredictionResultDto> SaveRiskPredictionAsync(
@@ -171,64 +192,107 @@ namespace Infrastructure.Persistence.Repositories
             StaffMatchAiResponse aiResult,
             CancellationToken cancellationToken = default)
         {
-            var entity = new DeXuatGiaoViecAI
-            {
-                MaCongViec = task.MaCongViec,
-                MaNguoiDuocDeXuat = user.MaNguoiDung,
-                TenMoHinh = "Random Forest Staff Matching",
-                DiemPhuHop = Round2(aiResult.XacSuatHieuQua),
-                DiemKyNang = Round2(user.DiemChatLuongTrungBinh),
-                DiemKhoiLuong = Round2(1m - user.PhanTramTai),
-                DiemKinhNghiem = Round2((decimal)user.SoNamKinhNghiem),
-                LyDo = BuildStaffReason(aiResult, user),
-                DaChapNhan = false,
-                NgayTao = DateTime.UtcNow
-            };
+            await using var transaction = await _context.Database
+                .BeginTransactionAsync(cancellationToken);
+
+            var oldSuggestions = await _context.DeXuatGiaoViecAIs
+                .Where(x =>
+                    x.MaCongViec == task.MaCongViec &&
+                    x.MaNguoiDuocDeXuat == user.MaNguoiDung &&
+                    x.TenMoHinh == StaffMatchingModelName)
+                .ToListAsync(cancellationToken);
+
+            _context.DeXuatGiaoViecAIs.RemoveRange(oldSuggestions);
+
+            var entity = BuildStaffMatchEntity(
+                task,
+                user,
+                aiResult,
+                DateTime.UtcNow);
 
             _context.DeXuatGiaoViecAIs.Add(entity);
-            await _context.SaveChangesAsync(cancellationToken);
 
-            return new StaffMatchResultDto
-            {
-                MaDeXuat = entity.MaDeXuat,
-                MaCongViec = entity.MaCongViec,
-                MaNguoiDuocDeXuat = entity.MaNguoiDuocDeXuat,
-                HoTenNguoiDuocDeXuat = user.HoTen,
-                TenMoHinh = entity.TenMoHinh,
-                DiemPhuHop = entity.DiemPhuHop,
-                DiemKyNang = entity.DiemKyNang,
-                DiemKhoiLuong = entity.DiemKhoiLuong,
-                DiemKinhNghiem = entity.DiemKinhNghiem,
-                LyDo = entity.LyDo,
-                DaChapNhan = entity.DaChapNhan,
-                NgayTao = entity.NgayTao
-            };
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return ToStaffMatchResultDto(entity, user.HoTen);
+        }
+
+        public async Task<IReadOnlyList<StaffMatchResultDto>> ReplaceStaffSuggestionsAsync(
+            AiTaskDataDto task,
+            IReadOnlyList<StaffMatchSaveItemDto> suggestions,
+            CancellationToken cancellationToken = default)
+        {
+            await using var transaction = await _context.Database
+                .BeginTransactionAsync(cancellationToken);
+
+            var oldSuggestions = await _context.DeXuatGiaoViecAIs
+                .Where(x =>
+                    x.MaCongViec == task.MaCongViec &&
+                    x.TenMoHinh == StaffMatchingModelName)
+                .ToListAsync(cancellationToken);
+
+            _context.DeXuatGiaoViecAIs.RemoveRange(oldSuggestions);
+
+            var now = DateTime.UtcNow;
+
+            var newSuggestions = suggestions
+                .Select(x => new
+                {
+                    x.User,
+                    Entity = BuildStaffMatchEntity(
+                        task,
+                        x.User,
+                        x.AiResult,
+                        now)
+                })
+                .ToList();
+
+            _context.DeXuatGiaoViecAIs.AddRange(newSuggestions.Select(x => x.Entity));
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return newSuggestions
+                .Select(x => ToStaffMatchResultDto(x.Entity, x.User.HoTen))
+                .OrderByDescending(x => x.DiemPhuHop)
+                .ToList();
         }
 
         public async Task<IReadOnlyList<BottleneckResultDto>> SaveBottleneckResultsAsync(
             IReadOnlyList<BottleneckAiResponse> aiResults,
             CancellationToken cancellationToken = default)
         {
-            var savedResults = new List<BottleneckResultDto>();
+            if (aiResults.Count == 0)
+            {
+                return Array.Empty<BottleneckResultDto>();
+            }
+
+            var taskIds = aiResults
+                .Select(x => x.MaCongViec)
+                .Distinct()
+                .ToList();
+
+            var tasksById = await _context.CongViecs
+                .AsNoTracking()
+                .Where(x => taskIds.Contains(x.MaCongViec))
+                .Select(x => new
+                {
+                    x.MaCongViec,
+                    x.MaDuAn
+                })
+                .ToDictionaryAsync(x => x.MaCongViec, cancellationToken);
+
+            var entities = new List<DiemNghenAI>();
 
             foreach (var result in aiResults)
             {
-                var task = await _context.CongViecs
-                    .AsNoTracking()
-                    .Where(x => x.MaCongViec == result.MaCongViec)
-                    .Select(x => new
-                    {
-                        x.MaCongViec,
-                        x.MaDuAn
-                    })
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                if (task == null)
+                if (!tasksById.TryGetValue(result.MaCongViec, out var task))
                 {
                     continue;
                 }
 
-                var entity = new DiemNghenAI
+                entities.Add(new DiemNghenAI
                 {
                     MaDuAn = task.MaDuAn,
                     MaCongViec = task.MaCongViec,
@@ -238,26 +302,78 @@ namespace Infrastructure.Persistence.Repositories
                     SoNgayTreDuBao = 0,
                     KhuyenNghiAI = BuildBottleneckRecommendation(result),
                     NgayPhatHien = DateTime.UtcNow
-                };
-
-                _context.DiemNghenAIs.Add(entity);
-                await _context.SaveChangesAsync(cancellationToken);
-
-                savedResults.Add(new BottleneckResultDto
-                {
-                    MaDiemNghen = entity.MaDiemNghen,
-                    MaDuAn = entity.MaDuAn,
-                    MaCongViec = entity.MaCongViec,
-                    KhuVucPhatHien = entity.KhuVucPhatHien,
-                    NguyenNhan = entity.NguyenNhan,
-                    MucDoNghiemTrong = entity.MucDoNghiemTrong,
-                    SoNgayTreDuBao = entity.SoNgayTreDuBao,
-                    KhuyenNghiAI = entity.KhuyenNghiAI,
-                    NgayPhatHien = entity.NgayPhatHien
                 });
             }
 
-            return savedResults;
+            if (entities.Count == 0)
+            {
+                return Array.Empty<BottleneckResultDto>();
+            }
+
+            await using var transaction = await _context.Database
+                .BeginTransactionAsync(cancellationToken);
+
+            _context.DiemNghenAIs.AddRange(entities);
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return entities
+                .Select(x => new BottleneckResultDto
+                {
+                    MaDiemNghen = x.MaDiemNghen,
+                    MaDuAn = x.MaDuAn,
+                    MaCongViec = x.MaCongViec,
+                    KhuVucPhatHien = x.KhuVucPhatHien,
+                    NguyenNhan = x.NguyenNhan,
+                    MucDoNghiemTrong = x.MucDoNghiemTrong,
+                    SoNgayTreDuBao = x.SoNgayTreDuBao,
+                    KhuyenNghiAI = x.KhuyenNghiAI,
+                    NgayPhatHien = x.NgayPhatHien
+                })
+                .ToList();
+        }
+
+        private static DeXuatGiaoViecAI BuildStaffMatchEntity(
+            AiTaskDataDto task,
+            AiUserDataDto user,
+            StaffMatchAiResponse aiResult,
+            DateTime createdAt)
+        {
+            return new DeXuatGiaoViecAI
+            {
+                MaCongViec = task.MaCongViec,
+                MaNguoiDuocDeXuat = user.MaNguoiDung,
+                TenMoHinh = StaffMatchingModelName,
+                DiemPhuHop = Round2(aiResult.XacSuatHieuQua),
+                DiemKyNang = Round2(user.DiemChatLuongTrungBinh),
+                DiemKhoiLuong = Round2(1m - user.PhanTramTai),
+                DiemKinhNghiem = Round2((decimal)user.SoNamKinhNghiem),
+                LyDo = BuildStaffReason(aiResult, user),
+                DaChapNhan = false,
+                NgayTao = createdAt
+            };
+        }
+
+        private static StaffMatchResultDto ToStaffMatchResultDto(
+            DeXuatGiaoViecAI entity,
+            string hoTenNguoiDuocDeXuat)
+        {
+            return new StaffMatchResultDto
+            {
+                MaDeXuat = entity.MaDeXuat,
+                MaCongViec = entity.MaCongViec,
+                MaNguoiDuocDeXuat = entity.MaNguoiDuocDeXuat,
+                HoTenNguoiDuocDeXuat = hoTenNguoiDuocDeXuat,
+                TenMoHinh = entity.TenMoHinh,
+                DiemPhuHop = entity.DiemPhuHop,
+                DiemKyNang = entity.DiemKyNang,
+                DiemKhoiLuong = entity.DiemKhoiLuong,
+                DiemKinhNghiem = entity.DiemKinhNghiem,
+                LyDo = entity.LyDo,
+                DaChapNhan = entity.DaChapNhan,
+                NgayTao = entity.NgayTao
+            };
         }
 
         private static decimal CalculateWorkloadRatio(decimal current, decimal max)
