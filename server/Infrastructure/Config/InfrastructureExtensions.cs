@@ -9,6 +9,7 @@ using Application.Features.Lookups;
 namespace Infrastructure.Config;
 using Application.Features.Lookups;
 using Infrastructure.Persistence.Repositories;
+using Application.Features.Tasks;
 public static class InfrastructureExtensions
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
@@ -24,6 +25,8 @@ public static class InfrastructureExtensions
         services.AddScoped<ILookupService, LookupService>();
         services.AddScoped<ILookupRepository, LookupRepository>();
         services.AddScoped<ILookupService, LookupService>();
+        services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<ITaskService, TaskService>();
         return services;
     }
 }
