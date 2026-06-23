@@ -10,8 +10,9 @@ import numpy as np
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from imblearn.over_sampling import SMOTE
 import joblib
+from imblearn.over_sampling import SMOTE
+
 
 # ============================================================
 # ĐƯỜNG DẪN
@@ -137,7 +138,14 @@ def chay_pipeline(df, feature_cols, label_col, scaler_name, test_size=0.2):
 
     X = df[valid_cols].copy()
     y = df[label_col].copy()
-
+    class_counts = y.value_counts()
+    if len(class_counts) < 2:
+        raise ValueError(f"{label_col} cần ít nhất 2 class để train")
+    if class_counts.min() < 2:
+        raise ValueError(
+            f"{label_col} cần ít nhất 2 dòng mỗi class để stratified split: "
+            f"{dict(class_counts)}"
+        )
     # BƯỚC 1: SPLIT TRƯỚC — fix data leak
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
@@ -160,21 +168,14 @@ def chay_pipeline(df, feature_cols, label_col, scaler_name, test_size=0.2):
 
     # BƯỚC 3: SMOTE — chỉ trên train
     ratio = y_train.value_counts().min() / y_train.value_counts().max()
-    if ratio < 0.8:
-        smote = SMOTE(random_state=42)
-        X_train_scaled, y_train = smote.fit_resample(X_train_scaled, y_train)
-        print(f"   Train label sau SMOTE:  {dict(pd.Series(y_train).value_counts())}")
-        print(f"   Train sau SMOTE: {len(X_train_scaled)} dòng")
-    else:
-        print(f"   Dữ liệu cân bằng ({ratio:.0%}) → không cần SMOTE")
+    print(f"   Train label trước SMOTE: {dict(y_train.value_counts())}")
+    print(f"   Tỉ lệ class train: {ratio:.0%} (SMOTE sẽ apply trong lúc train model)")
 
-    # Tạo DataFrame
     X_train_df = pd.DataFrame(X_train_scaled, columns=valid_cols)
     X_train_df[label_col] = y_train.values if hasattr(y_train, 'values') else y_train
 
     X_test_df = pd.DataFrame(X_test_scaled, columns=valid_cols)
     X_test_df[label_col] = y_test.values
-
     return X_train_df, X_test_df
 
 

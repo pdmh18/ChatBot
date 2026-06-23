@@ -17,6 +17,7 @@ from torch_geometric.nn import GCNConv
 from pathlib import Path
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.model_selection import train_test_split  
 
 # ============================================================
 # ĐƯỜNG DẪN
@@ -43,7 +44,7 @@ LEARNING_RATE = 0.01
 # BƯỚC 1: CHUẨN BỊ DỮ LIỆU ĐỒ THỊ
 # ============================================================
 
-def load_graph_data():
+def load_graph_data(fit_artifacts: bool = True):
     """
     Tải và chuẩn bị dữ liệu đồ thị:
     - Node: mỗi task là 1 node
@@ -56,10 +57,18 @@ def load_graph_data():
     print(f"   Nodes: {len(node_df)} task")
 
     # Encode TrangThaiHienTai
-    le = LabelEncoder()
-    node_df["TrangThaiHienTai_Encoded"] = le.fit_transform(
-        node_df["TrangThaiHienTai"].fillna("Unknown")
-    )
+    encoder_path = MODEL_DIR / "gnn_status_encoder.joblib"
+    if fit_artifacts:
+        le = LabelEncoder()
+        node_df["TrangThaiHienTai_Encoded"] = le.fit_transform(
+            node_df["TrangThaiHienTai"].fillna("Unknown")
+        )
+        joblib.dump(le, encoder_path)
+    else:
+        le = joblib.load(encoder_path)
+        node_df["TrangThaiHienTai_Encoded"] = le.transform(
+            node_df["TrangThaiHienTai"].fillna("Unknown")
+        )
 
     # Fill null
     node_df["SoGioUocTinh"] = node_df["SoGioUocTinh"].fillna(
@@ -69,16 +78,20 @@ def load_graph_data():
 
     # Tính nhãn từ SoTaskBiAnhHuongPhiaSau
     # Node có nhiều task phụ thuộc → điểm nghẽn
-    threshold = node_df["SoTaskBiAnhHuongPhiaSau"].quantile(0.75)
-    node_df[LABEL_COL] = (node_df["SoTaskBiAnhHuongPhiaSau"] >= threshold).astype(int)
-
+    node_df[LABEL_COL] = node_df["SoTaskBiAnhHuongPhiaSau"].apply(
+        lambda x: 1 if x >= 1 else 0
+    )
     print(f"   Nhãn: {dict(node_df[LABEL_COL].value_counts())}")
-    print(f"   Ngưỡng bottleneck: SoTaskBiAnhHuongPhiaSau ≥ {threshold:.0f}")
 
     # Normalize features
-    scaler = MinMaxScaler()
-    features = scaler.fit_transform(node_df[NODE_FEATURE_COLS])
-    joblib.dump(scaler, MODEL_DIR / "gnn_scaler.joblib")
+    scaler_path = MODEL_DIR / "gnn_scaler.joblib"
+    if fit_artifacts:
+        scaler = MinMaxScaler()
+        features = scaler.fit_transform(node_df[NODE_FEATURE_COLS])
+        joblib.dump(scaler, scaler_path)
+    else:
+        scaler = joblib.load(scaler_path)
+        features = scaler.transform(node_df[NODE_FEATURE_COLS])
 
     # Tạo mapping MaCongViec → index
     node_ids = node_df["MaCongViec"].values
@@ -173,14 +186,18 @@ def train():
 
     # Chia train/test mask (80/20)
     num_nodes = data.num_nodes
-    perm      = torch.randperm(num_nodes)
-    train_size = int(0.8 * num_nodes)
+    indices   = np.arange(num_nodes)
+    train_idx, test_idx = train_test_split(
+        indices,
+        test_size=0.2,
+        random_state=42,
+        stratify=data.y.numpy(),
+    )
 
     train_mask = torch.zeros(num_nodes, dtype=torch.bool)
     test_mask  = torch.zeros(num_nodes, dtype=torch.bool)
-    train_mask[perm[:train_size]]  = True
-    test_mask[perm[train_size:]]   = True
-
+    train_mask[train_idx] = True
+    test_mask[test_idx]   = True
     data.train_mask = train_mask
     data.test_mask  = test_mask
 
@@ -197,7 +214,7 @@ def train():
     print(f"   Kiến trúc: GCNConv({data.num_features}) → GCNConv(64) → GCNConv(32) → GCNConv(2)")
     print(f"   Optimizer: Adam | lr={LEARNING_RATE} | weight_decay=5e-4")
     print(f"   Epochs: {NUM_EPOCHS}")
-    print(f"   Dropout: 0.3")
+    print("   Dropout: 0.3")
 
     # --------------------------------------------------------
     # 3. TRAIN
@@ -294,6 +311,8 @@ def predict_bottleneck(top_n: int = 10) -> list:
     
     Output: danh sách task có nguy cơ là điểm nghẽn cao nhất
     """
+    if top_n < 1:
+        raise ValueError("top_n phải >= 1")
     # Load model
     metadata = joblib.load(MODEL_DIR / "gnn_metadata.joblib")
     model    = GCN(
@@ -304,7 +323,7 @@ def predict_bottleneck(top_n: int = 10) -> list:
     model.eval()
 
     # Load data
-    data, node_df, _ = load_graph_data()
+    data, node_df, _ = load_graph_data(fit_artifacts=False)
 
     with torch.no_grad():
         out   = model(data.x, data.edge_index)

@@ -87,13 +87,13 @@ def train():
         n_jobs           = -1,
     )
 
-    print(f"   Tham số Random Forest:")
-    print(f"     n_estimators:      200")
-    print(f"     max_depth:         6")
-    print(f"     min_samples_split: 5")
-    print(f"     min_samples_leaf:  2")
-    print(f"     max_features:      sqrt")
-    print(f"     class_weight:      balanced")
+    print("   Tham số Random Forest:")
+    print("     n_estimators:      200")
+    print("     max_depth:         6")
+    print("     min_samples_split: 5")
+    print("     min_samples_leaf:  2")
+    print("     max_features:      sqrt")
+    print("     class_weight:      balanced")
 
     # --------------------------------------------------------
     # 3. CROSS-VALIDATION
@@ -221,14 +221,15 @@ def predict_staff_match(task_features: dict, model=None, threshold=None) -> dict
 
     proba = model.predict_proba(X)[0, 1]
     label = int(proba >= threshold)
+    muc_do_phu_hop = "Cao" if label else (
+        "Trung bình" if proba >= threshold * 0.8 else "Thấp"
+    )
 
     return {
         "xac_suat_hieu_qua":  round(float(proba), 4),
         "de_xuat_giao_viec":  bool(label),
-        "muc_do_phu_hop":     "Cao" if proba > 0.7 else (
-                              "Trung bình" if proba > 0.4 else "Thấp"),
+        "muc_do_phu_hop":     muc_do_phu_hop,
     }
-
 
 if __name__ == "__main__":
     train()

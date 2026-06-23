@@ -11,8 +11,8 @@ class TaskRiskRequest(BaseModel):
     SoGioUocTinh: float = Field(..., ge=0, description="Số giờ ước tính hoàn thành task")
     SoNamKinhNghiemNhanSu: float = Field(..., ge=0, le=50, description="Số năm kinh nghiệm người phụ trách")
     KhoiLuongHienTaiNhanSu: float = Field(..., ge=0, le=1, description="Khối lượng hiện tại (0-1)")
-    SoCongViecPhuThuocTruoc: float = Field(..., ge=0, description="Số task phải xong trước task này")
-    DoUuTien_Encoded: float = Field(..., ge=0, le=3, description="Độ ưu tiên: 0=Thấp, 1=TB, 2=Cao, 3=Khẩn")
+    SoCongViecPhuThuocTruoc: int = Field(..., ge=0, description="Số task phải xong trước task này")
+    DoUuTien_Encoded: int = Field(..., ge=0, le=3, description="Độ ưu tiên: 0=Thấp, 1=TB, 2=Cao, 3=Khẩn")
 
 class TaskRiskResponse(BaseModel):
     xac_suat_tre_han: float

@@ -8,6 +8,7 @@ from src.api.schemas import (
 from src.models.train_risk_model import predict_risk
 from src.models.staff_matching import predict_staff_match
 from src.models.bottleneck_detector import predict_bottleneck
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/api", tags=["AI - Risk & Resource"])
 
@@ -33,7 +34,7 @@ def predict_task_risk(req: TaskRiskRequest):
             detail="Model chưa train. Chạy: python -m src.models.train_risk_model"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Không thể xử lý yêu cầu") from e
 
 
 # ============================================================
@@ -57,7 +58,7 @@ def match_staff(req: StaffMatchRequest):
             detail="Model chưa train. Chạy: python -m src.models.staff_matching"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Không thể xử lý yêu cầu") from e
 
 
 # ============================================================
@@ -65,7 +66,7 @@ def match_staff(req: StaffMatchRequest):
 # ============================================================
 
 @router.get("/analyze-bottleneck", response_model=list[BottleneckResult])
-def analyze_bottleneck(top_n: int = 10):
+def analyze_bottleneck(top_n: int = Query(10, ge=1, le=100)):
     """
     Phân tích đồ thị phụ thuộc công việc.
     Tìm và trả về top N task có nguy cơ là điểm nghẽn cao nhất.
@@ -81,4 +82,4 @@ def analyze_bottleneck(top_n: int = 10):
             detail="Model chưa train. Chạy: python -m src.models.bottleneck_detector"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Không thể xử lý yêu cầu") from e

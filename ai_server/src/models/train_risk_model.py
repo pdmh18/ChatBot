@@ -16,9 +16,11 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
     roc_curve
 )
-from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
+from imblearn.over_sampling import SMOTE
+
 
 
 # ============================================================
@@ -65,6 +67,14 @@ def train():
     print(f"   Train: {len(X_train)} dòng | Test: {len(X_test)} dòng")
     print(f"   Train label: {dict(y_train.value_counts())}")
     print(f"   Test label:  {dict(y_test.value_counts())}")
+    ratio = y_train.value_counts().min() / y_train.value_counts().max()
+    if ratio < 0.8:
+        print("\n   Áp dụng SMOTE để cân bằng dữ liệu train...")
+        smote = SMOTE(random_state=42)
+        X_train, y_train = smote.fit_resample(X_train, y_train)
+        print(f"   Train sau SMOTE: {len(X_train)} dòng | {dict(pd.Series(y_train).value_counts())}")
+    else:
+        print(f"   Dữ liệu cân bằng ({ratio:.0%}) → không cần SMOTE")
 
     # --------------------------------------------------------
     # 2. ĐỊNH NGHĨA MODEL XGBOOST
@@ -143,9 +153,16 @@ def train():
     # 4. TRAIN CHÍNH THỨC + ĐÁNH GIÁ
     # --------------------------------------------------------
     print("\n📌 [4/4] Train chính thức...")
+    X_fit, X_val, y_fit, y_val = train_test_split(
+        X_train,
+        y_train,
+        test_size=0.2,
+        random_state=42,
+        stratify=y_train,
+    )
     model.fit(
-        X_train, y_train,
-        eval_set=[(X_test, y_test)],
+        X_fit, y_fit,
+        eval_set=[(X_val, y_val)],
         verbose=True,
     )
 
@@ -201,13 +218,14 @@ def train():
 
     # Lưu thêm metadata
     metadata = {
-        "feature_cols":  FEATURE_COLS,
-        "label_col":     LABEL_COL,
-        "roc_auc":       round(roc_auc, 4),
-        "cv_roc_auc_mean": round(cv_scores.mean(), 4),
-        "cv_roc_auc_std":  round(cv_scores.std(), 4),
-        "n_train":       len(X_train),
-        "n_test":        len(X_test),
+        "feature_cols":     FEATURE_COLS,
+        "label_col":        LABEL_COL,
+        "roc_auc":          round(roc_auc, 4),
+        "optimal_threshold": round(float(optimal_threshold), 4),
+        "cv_roc_auc_mean":  round(cv_scores.mean(), 4),
+        "cv_roc_auc_std":   round(cv_scores.std(), 4),
+        "n_train":          len(X_train),
+        "n_test":           len(X_test),
     }
     joblib.dump(metadata, MODEL_DIR / "risk_model_metadata.joblib")
     print(f"✅ Metadata lưu tại: {MODEL_DIR / 'risk_model_metadata.joblib'}")
@@ -242,6 +260,8 @@ def predict_risk(task_features: dict, model=None) -> dict:
     # Load model
     if model is None:
         model = joblib.load(MODEL_DIR / "risk_model.joblib")
+    metadata  = joblib.load(MODEL_DIR / "risk_model_metadata.joblib")
+    threshold = metadata.get("optimal_threshold", 0.5)
 
     # Chuẩn hóa input giống lúc train
     X_raw    = pd.DataFrame([task_features])[FEATURE_COLS]
@@ -249,7 +269,8 @@ def predict_risk(task_features: dict, model=None) -> dict:
     X        = pd.DataFrame(X_scaled, columns=FEATURE_COLS)
 
     proba = model.predict_proba(X)[0, 1]
-    label = int(proba > 0.5)
+    label = int(proba >= threshold)
+
 
     return {
         "xac_suat_tre_han": round(float(proba), 4),
