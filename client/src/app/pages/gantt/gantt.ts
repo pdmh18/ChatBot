@@ -1,5 +1,7 @@
-import { AfterViewInit, Component } from '@angular/core';
+﻿import { AfterViewInit, Component } from '@angular/core';
 import FrappeGantt from 'frappe-gantt';
+import { Task } from '../../models/task';
+import { TaskService } from '../../services/task';
 
 @Component({
   selector: 'app-gantt',
@@ -8,32 +10,35 @@ import FrappeGantt from 'frappe-gantt';
   styleUrl: './gantt.scss',
 })
 export class Gantt implements AfterViewInit {
-  ngAfterViewInit() {
-    new FrappeGantt('#gantt', [
-      {
-        id: '1',
-        name: 'Thiết kế database',
-        start: '2026-06-20',
-        end: '2026-06-25',
-        progress: 60,
+  constructor(private taskService: TaskService) {}
+
+  ngAfterViewInit(): void {
+    this.taskService.getTaskViews({ pageNumber: 1, pageSize: 100 }).subscribe({
+      next: (tasks) => this.renderGantt(tasks.slice(0, 30)),
+      error: () => this.renderGantt([]),
+    });
+  }
+
+  private renderGantt(tasks: Task[]): void {
+    const ganttTasks = tasks
+      .filter((task) => task.deadline)
+      .map((task) => ({
+        id: String(task.id),
+        name: task.name,
+        start: task.startDate || this.getFallbackStart(task.deadline),
+        end: task.deadline,
+        progress: task.progress ?? 0,
         dependencies: '',
-      },
-      {
-        id: '2',
-        name: 'API đăng nhập',
-        start: '2026-06-24',
-        end: '2026-06-28',
-        progress: 40,
-        dependencies: '1',
-      },
-      {
-        id: '3',
-        name: 'Màn hình Kanban',
-        start: '2026-06-26',
-        end: '2026-06-30',
-        progress: 30,
-        dependencies: '2',
-      },
-    ]);
+      }));
+
+    if (!ganttTasks.length) return;
+
+    new FrappeGantt('#gantt', ganttTasks);
+  }
+
+  private getFallbackStart(deadline: string): string {
+    const date = new Date(deadline);
+    date.setDate(date.getDate() - 3);
+    return date.toISOString().slice(0, 10);
   }
 }

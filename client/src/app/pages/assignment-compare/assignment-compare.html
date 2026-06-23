@@ -1,0 +1,124 @@
+﻿<section class="compare-page">
+  <div class="page-heading">
+    <div>
+      <h2>So sánh giao task truyền thống và AI</h2>
+      <p>Chọn cùng một dự án để xem khác biệt về số giờ, tải nhân sự và rủi ro trễ hạn.</p>
+    </div>
+
+    <button type="button" (click)="loadData()">Tải lại API</button>
+  </div>
+
+  @if (message) {
+    <div class="info-message">{{ message }}</div>
+  }
+
+  <section class="control-panel">
+    <label>
+      Dự án
+      <select [(ngModel)]="selectedProjectId" (ngModelChange)="recalculate()">
+        @for (project of projects; track project.id) {
+          <option [value]="project.id">{{ project.name }}</option>
+        }
+      </select>
+    </label>
+
+    <label>
+      Số task mới cần giao
+      <input type="number" min="1" max="30" [(ngModel)]="newTaskCount" (ngModelChange)="recalculate()" />
+    </label>
+
+    <label>
+      Số giờ / task
+      <input type="number" min="1" max="80" [(ngModel)]="hoursPerTask" (ngModelChange)="recalculate()" />
+    </label>
+
+    <label>
+      Tỷ lệ task khẩn cấp (%)
+      <input type="number" min="0" max="100" [(ngModel)]="urgentPercent" (ngModelChange)="recalculate()" />
+    </label>
+  </section>
+
+  <div class="summary-strip">
+    <div>
+      <span>Dự án đang xét</span>
+      <strong>{{ selectedProjectName }}</strong>
+    </div>
+    <div>
+      <span>Task hiện có</span>
+      <strong>{{ tasks.length }}</strong>
+    </div>
+    <div>
+      <span>Tổng giờ mới</span>
+      <strong>{{ newTaskCount * hoursPerTask }}h</strong>
+    </div>
+  </div>
+
+  <section class="compare-grid">
+    @for (result of compareResults; track result.method) {
+      <article class="compare-card" [class.ai-card]="result.method.includes('AI')">
+        <h3>{{ result.method }}</h3>
+        <p>{{ result.description }}</p>
+
+        <div class="metric-row">
+          <span>Tổng giờ giao mới</span>
+          <strong>{{ result.totalHours }}h</strong>
+        </div>
+        <div class="metric-row">
+          <span>Tải TB / lập trình viên</span>
+          <strong>{{ result.averageLoad }}h</strong>
+        </div>
+        <div class="metric-row">
+          <span>Rủi ro trễ hạn</span>
+          <strong>{{ result.riskScore }}%</strong>
+        </div>
+        <div class="metric-row">
+          <span>Dự báo trễ</span>
+          <strong>{{ result.predictedDelayDays }} ngày</strong>
+        </div>
+      </article>
+    }
+  </section>
+
+  <section class="content-grid">
+    <article class="panel">
+      <h3>Tải hiện tại của nhân sự</h3>
+
+      <div class="developer-table">
+        <div class="table-head">
+          <span>Nhân sự</span>
+          <span>Task</span>
+          <span>Giờ</span>
+          <span>Risk</span>
+        </div>
+
+        @for (developer of developerLoads; track developer.id) {
+          <div class="table-row">
+            <span>
+              <strong>{{ developer.name }}</strong>
+              <small>{{ developer.role }}</small>
+            </span>
+            <span>{{ developer.currentTasks }}</span>
+            <span>{{ developer.currentHours }}h</span>
+            <span>{{ developer.currentRisk }}%</span>
+          </div>
+        }
+      </div>
+    </article>
+
+    <article class="panel">
+      <h3>AI đề xuất giao task</h3>
+
+      <div class="assignment-list">
+        @for (assignment of aiAssignments; track assignment.taskName) {
+          <div class="assignment-item">
+            <div>
+              <strong>{{ assignment.taskName }}</strong>
+              <p>{{ assignment.reason }}</p>
+            </div>
+            <span>{{ assignment.developer }} · {{ assignment.estimatedHours }}h</span>
+          </div>
+        }
+      </div>
+    </article>
+  </section>
+</section>

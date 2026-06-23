@@ -4,6 +4,10 @@
   <div class="success-message">{{ successMessage }}</div>
 }
 
+@if (lookupMessage) {
+  <div class="lookup-message">{{ lookupMessage }}</div>
+}
+
 <div class="toolbar">
   <input
     type="text"
@@ -13,17 +17,16 @@
 
   <select [(ngModel)]="statusFilter">
     <option value="All">Tất cả trạng thái</option>
-    <option value="Todo">Todo</option>
-    <option value="In Progress">In Progress</option>
-    <option value="Review">Review</option>
-    <option value="Done">Done</option>
+    @for (status of statuses; track status.id) {
+      <option [value]="status.name">{{ getStatusLabel(status.name) }}</option>
+    }
   </select>
 
   <select [(ngModel)]="priorityFilter">
     <option value="All">Tất cả ưu tiên</option>
-    <option value="High">High</option>
-    <option value="Medium">Medium</option>
-    <option value="Low">Low</option>
+    @for (priority of priorities; track priority.id) {
+      <option [value]="priority.name">{{ getPriorityLabel(priority.name) }}</option>
+    }
   </select>
 
   <button type="button" class="add-btn" (click)="openAddTask()">
@@ -31,66 +34,141 @@
   </button>
 </div>
 
-<table class="task-table">
-  <thead>
-    <tr>
-      <th>Tên task</th>
-      <th>Dự án</th>
-      <th>Sprint</th>
-      <th>Người phụ trách</th>
-      <th>Trạng thái</th>
-      <th>Ưu tiên</th>
-      <th>Deadline</th>
-      <th>Risk AI</th>
-      <th>Hành động</th>
-    </tr>
-  </thead>
-
-  <tbody>
-    @for (task of filteredTasks; track task.id) {
+<div class="table-card">
+  <table class="task-table">
+    <thead>
       <tr>
-        <td>{{ task.name }}</td>
-        <td>{{ task.project }}</td>
-        <td>{{ task.sprint }}</td>
-        <td>{{ task.assignee }}</td>
-        <td>{{ task.status }}</td>
-        <td>{{ task.priority }}</td>
-        <td>{{ task.deadline }}</td>
-        <td>{{ task.riskScore }}%</td>
-        <td>
-          <button type="button" (click)="selectTask(task)">Xem</button>
-          <button type="button" (click)="showAiSuggestion(task)">Gợi ý AI</button>
-        </td>
+        <th>Tên task</th>
+        <th>Dự án</th>
+        <th>Sprint</th>
+        <th>Người phụ trách</th>
+        <th>Trạng thái</th>
+        <th>Ưu tiên</th>
+        <th>Deadline</th>
+        <th>Tiến độ</th>
+        <th>Risk AI</th>
+        <th>Hành động</th>
       </tr>
-    }
-  </tbody>
-</table>
+    </thead>
+
+    <tbody>
+      @for (task of filteredTasks; track task.id) {
+        <tr>
+          <td class="task-name">{{ task.name }}</td>
+          <td>{{ task.project }}</td>
+          <td>{{ task.sprint }}</td>
+          <td>{{ task.assignee }}</td>
+          <td>
+            <span class="status-pill">{{ getStatusLabel(task.status) }}</span>
+          </td>
+          <td>{{ getPriorityLabel(task.priority) }}</td>
+          <td>{{ task.deadline }}</td>
+          <td>{{ task.progress ?? 0 }}%</td>
+          <td>
+            <span class="risk-pill" [class.high-risk]="task.riskScore >= 70">
+              {{ task.riskScore }}%
+            </span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button type="button" class="table-btn primary" (click)="selectTask(task)">Xem</button>
+              <button type="button" class="table-btn secondary" (click)="showAiSuggestion(task)">Gợi ý AI</button>
+              <button type="button" class="table-btn danger" (click)="deleteTask(task)">Xóa</button>
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (!filteredTasks.length) {
+  <div class="empty-state">
+    {{ taskDataMessage }}
+  </div>
+}
 
 @if (selectedTask) {
-  <div class="task-detail">
-    <h3>Chi tiết task</h3>
+  <div class="modal-backdrop" (click)="closeTaskDetail()">
+    <div class="modal detail-modal" (click)="$event.stopPropagation()">
+      <header class="modal-header">
+        <div>
+          <h3>Chi tiết task</h3>
+          <p>{{ selectedTask.name }}</p>
+        </div>
 
-    <p><b>Tên task:</b> {{ selectedTask.name }}</p>
-    <p><b>Dự án:</b> {{ selectedTask.project }}</p>
-    <p><b>Sprint:</b> {{ selectedTask.sprint }}</p>
-    <p><b>Người phụ trách:</b> {{ selectedTask.assignee }}</p>
-    <p><b>Trạng thái:</b> {{ selectedTask.status }}</p>
-    <p><b>Ưu tiên:</b> {{ selectedTask.priority }}</p>
-    <p><b>Deadline:</b> {{ selectedTask.deadline }}</p>
-    <p><b>Risk AI:</b> {{ selectedTask.riskScore }}%</p>
+        <button type="button" class="close-btn" (click)="$event.stopPropagation(); closeTaskDetail()">X</button>
+      </header>
+
+      <div class="modal-body detail-grid">
+        <div class="detail-item">
+          <span>Mã task</span>
+          <strong>{{ selectedTask.code || selectedTask.id }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Risk AI</span>
+          <strong>{{ selectedTask.riskScore }}% - {{ selectedTask.riskLevel }}</strong>
+        </div>
+
+        <div class="detail-item full">
+          <span>Mô tả</span>
+          <strong>{{ selectedTask.description || 'Chưa có mô tả' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Dự án</span>
+          <strong>{{ selectedTask.project }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Sprint</span>
+          <strong>{{ selectedTask.sprint || 'Chưa chọn sprint' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Người phụ trách</span>
+          <strong>{{ selectedTask.assignee || 'Chưa phân công' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Trạng thái</span>
+          <strong>{{ getStatusLabel(selectedTask.status) }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Ưu tiên</span>
+          <strong>{{ getPriorityLabel(selectedTask.priority) }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Deadline</span>
+          <strong>{{ selectedTask.deadline }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Tiến độ</span>
+          <strong>{{ selectedTask.progress ?? 0 }}%</strong>
+        </div>
+      </div>
+
+      <footer class="modal-actions">
+        <button type="button" class="secondary-btn" (click)="$event.stopPropagation(); closeTaskDetail()">Đóng</button>
+      </footer>
+    </div>
   </div>
 }
 
 @if (suggestionTask) {
-  <div class="modal-backdrop">
-    <div class="modal">
+  <div class="modal-backdrop" (click)="closeSuggestion()">
+    <div class="modal" (click)="$event.stopPropagation()">
       <header class="modal-header">
         <div>
           <h3>Gợi ý giao việc</h3>
           <p>{{ suggestionTask.name }}</p>
         </div>
 
-        <button type="button" (click)="closeSuggestion()">X</button>
+        <button type="button" class="close-btn" (click)="$event.stopPropagation(); closeSuggestion()">X</button>
       </header>
 
       <div class="developer-list">
@@ -112,20 +190,24 @@
           </div>
         }
       </div>
+
+      <footer class="modal-actions">
+        <button type="button" class="secondary-btn" (click)="$event.stopPropagation(); closeSuggestion()">Đóng</button>
+      </footer>
     </div>
   </div>
 }
 
 @if (isAddTaskOpen) {
-  <div class="modal-backdrop">
-    <div class="modal">
+  <div class="modal-backdrop" (click)="closeAddTask()">
+    <div class="modal" (click)="$event.stopPropagation()">
       <header class="modal-header">
         <div>
           <h3>Thêm task</h3>
-          <p>Tạo task mới bằng dữ liệu mock</p>
+          <p>Tạo task mới bằng API backend</p>
         </div>
 
-        <button type="button" (click)="closeAddTask()">X</button>
+        <button type="button" class="close-btn" (click)="$event.stopPropagation(); closeAddTask()">X</button>
       </header>
 
       <div class="task-form">
@@ -138,37 +220,60 @@
           <input type="text" [(ngModel)]="newTask.name" maxlength="80" />
         </label>
 
+        <label class="full-field">
+          Mô tả
+          <textarea rows="3" [(ngModel)]="newTask.description"></textarea>
+        </label>
+
+        <label>
+          Dự án
+          <select [(ngModel)]="newTask.project" (ngModelChange)="onProjectChange($event)">
+            @for (project of projects; track project.id) {
+              <option [value]="project.name">{{ project.name }}</option>
+            }
+          </select>
+        </label>
+
         <label>
           Sprint
           <select [(ngModel)]="newTask.sprint">
-            <option value="Sprint 1">Sprint 1</option>
-            <option value="Sprint 2">Sprint 2</option>
-            <option value="Sprint 3">Sprint 3</option>
+            <option value="">Không chọn sprint</option>
+            @for (sprint of filteredSprintsForForm; track sprint.id) {
+              <option [value]="sprint.tenSprint">{{ sprint.tenSprint }}</option>
+            }
           </select>
         </label>
 
         <label>
           Người phụ trách
-          <input type="text" [(ngModel)]="newTask.assignee" />
+          <select [(ngModel)]="newTask.assignee">
+            @for (user of users; track user.id) {
+              <option [value]="user.hoTen">{{ user.hoTen }}</option>
+            }
+          </select>
         </label>
 
         <label>
           Trạng thái
           <select [(ngModel)]="newTask.status">
-            <option value="Todo">Todo</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Review">Review</option>
-            <option value="Done">Done</option>
+            @for (status of statuses; track status.id) {
+              <option [value]="status.name">{{ getStatusLabel(status.name) }}</option>
+            }
           </select>
         </label>
 
         <label>
           Ưu tiên
           <select [(ngModel)]="newTask.priority">
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
+            @for (priority of priorities; track priority.id) {
+              <option [value]="priority.name">{{ getPriorityLabel(priority.name) }}</option>
+            }
           </select>
+        </label>
+
+        <label>
+          Ngày bắt đầu
+          <input type="date" [(ngModel)]="newTask.startDate" />
         </label>
 
         <label>
@@ -177,13 +282,13 @@
         </label>
 
         <label>
-          Risk AI
-          <input type="number" min="0" max="100" [(ngModel)]="newTask.riskScore" />
+          Số giờ ước tính
+          <input type="number" min="1" [(ngModel)]="newTask.estimatedHours" />
         </label>
       </div>
 
       <footer class="modal-actions">
-        <button type="button" class="secondary-btn" (click)="closeAddTask()">
+        <button type="button" class="secondary-btn" (click)="$event.stopPropagation(); closeAddTask()">
           Hủy
         </button>
 
@@ -194,3 +299,4 @@
     </div>
   </div>
 }
+

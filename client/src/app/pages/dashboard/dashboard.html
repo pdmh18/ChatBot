@@ -1,5 +1,9 @@
 ﻿<h2>Dashboard</h2>
 
+@if (dashboardMessage) {
+  <div class="dashboard-message">{{ dashboardMessage }}</div>
+}
+
 <div class="stats">
   @for (stat of stats; track stat.label) {
     <div class="card" [class.warning]="stat.type === 'warning'" [class.danger]="stat.type === 'danger'">
@@ -13,21 +17,29 @@
   <div class="chart-card">
     <h3>Trạng thái task</h3>
 
-    <canvas
-      baseChart
-      [data]="taskStatusChart"
-      [type]="'doughnut'"
-    ></canvas>
+    @if (stats[1].value > 0) {
+      <canvas
+        baseChart
+        [data]="taskStatusChart"
+        [type]="'doughnut'"
+      ></canvas>
+    } @else {
+      <div class="empty-chart">Chưa có task để vẽ biểu đồ.</div>
+    }
   </div>
 
   <div class="chart-card">
     <h3>Mức độ rủi ro task</h3>
 
-    <canvas
-      baseChart
-      [data]="riskChart"
-      [type]="'bar'"
-    ></canvas>
+    @if (stats[1].value > 0) {
+      <canvas
+        baseChart
+        [data]="riskChart"
+        [type]="'bar'"
+      ></canvas>
+    } @else {
+      <div class="empty-chart">Chưa có dữ liệu rủi ro.</div>
+    }
   </div>
 </div>
 
@@ -44,6 +56,8 @@
 
         <span class="risk-badge">{{ task.riskScore }}%</span>
       </div>
+    } @empty {
+      <div class="empty-insight">Chưa có task rủi ro cao.</div>
     }
   </section>
 
@@ -59,6 +73,8 @@
 
         <span class="severity-badge">{{ item.severity }}</span>
       </div>
+    } @empty {
+      <div class="empty-insight">Chưa phát hiện điểm nghẽn lớn.</div>
     }
   </section>
 </div>
