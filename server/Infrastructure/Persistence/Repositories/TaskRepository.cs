@@ -12,6 +12,8 @@ namespace Infrastructure.Persistence.Repositories
 {
     public class TaskRepository : ITaskRepository
     {
+        private const string StatusDone = "Hoan thanh";
+
         private readonly QuanLyDuAnAiContext _context;
 
         public TaskRepository(QuanLyDuAnAiContext context)
@@ -53,16 +55,20 @@ namespace Infrastructure.Persistence.Repositories
 
             if (!string.IsNullOrWhiteSpace(query.Status))
             {
-                dbQuery = dbQuery.Where(x => x.TrangThai == query.Status);
+                var status = query.Status.Trim();
+                dbQuery = dbQuery.Where(x => x.TrangThai == status);
             }
 
             if (!string.IsNullOrWhiteSpace(query.Priority))
             {
-                dbQuery = dbQuery.Where(x => x.DoUuTien == query.Priority);
+                var priority = query.Priority.Trim();
+                dbQuery = dbQuery.Where(x => x.DoUuTien == priority);
             }
 
             return await dbQuery
                 .OrderByDescending(x => x.NgayTao)
+                .Skip((query.PageNumber - 1) * query.PageSize)
+                .Take(query.PageSize)
                 .Select(x => new TaskListItemDto
                 {
                     MaCongViec = x.MaCongViec,
@@ -240,8 +246,7 @@ namespace Infrastructure.Persistence.Repositories
                 entity.TienDo = request.TienDo.Value;
             }
 
-            if (string.Equals(request.TrangThai, "Done", StringComparison.OrdinalIgnoreCase) ||
-    string.Equals(request.TrangThai, "Hoàn thành", StringComparison.OrdinalIgnoreCase))
+            if (IsDoneStatus(request.TrangThai))
             {
                 entity.TienDo = 100;
                 entity.NgayHoanThanh ??= DateOnly.FromDateTime(DateTime.Today);
@@ -299,6 +304,14 @@ namespace Infrastructure.Persistence.Repositories
             return _context.Sprints
                 .AsNoTracking()
                 .AnyAsync(x => x.MaSprint == sprintId && x.MaDuAn == projectId, cancellationToken);
+        }
+
+        private static bool IsDoneStatus(string? status)
+        {
+            return string.Equals(
+                status?.Trim(),
+                StatusDone,
+                StringComparison.OrdinalIgnoreCase);
         }
     }
 }

@@ -9,26 +9,41 @@ namespace Application.Features.Tasks
 {
     public class TaskService : ITaskService
     {
+        private const string PriorityLow = "Thap";
+        private const string PriorityMedium = "Trung binh";
+        private const string PriorityHigh = "Cao";
+        private const string PriorityUrgent = "Khan cap";
+
+        private const string StatusTodo = "Can lam";
+        private const string StatusDoing = "Dang lam";
+        private const string StatusReview = "Cho kiem tra";
+        private const string StatusDone = "Hoan thanh";
+        private const string StatusBlocked = "Bi chan";
+        private const string StatusWaitingApproval = "Cho duyet";
+        private const string StatusApproved = "Da duyet";
+        private const string StatusRejected = "Bi tu choi";
+        private const string StatusCanceled = "Da huy";
+
         private static readonly HashSet<string> AllowedPriorities = new(StringComparer.OrdinalIgnoreCase)
-{
-    "Thap",
-    "Trung binh",
-    "Cao",
-    "Khan cap"
-};
+        {
+            PriorityLow,
+            PriorityMedium,
+            PriorityHigh,
+            PriorityUrgent
+        };
 
         private static readonly HashSet<string> AllowedStatuses = new(StringComparer.OrdinalIgnoreCase)
-{
-    "Can lam",
-    "Dang lam",
-    "Cho kiem tra",
-    "Hoan thanh",
-    "Bi chan",
-    "Cho duyet",
-    "Da duyet",
-    "Bi tu choi",
-    "Da huy"
-};
+        {
+            StatusTodo,
+            StatusDoing,
+            StatusReview,
+            StatusDone,
+            StatusBlocked,
+            StatusWaitingApproval,
+            StatusApproved,
+            StatusRejected,
+            StatusCanceled
+        };
 
         private readonly ITaskRepository _taskRepository;
 
@@ -251,12 +266,15 @@ namespace Application.Features.Tasks
         {
             request.TenCongViec = request.TenCongViec?.Trim() ?? string.Empty;
             request.MaCongViecCode = request.MaCongViecCode?.Trim();
+
             request.DoUuTien = string.IsNullOrWhiteSpace(request.DoUuTien)
-                ? "Trung binh"
+                ? PriorityMedium
                 : request.DoUuTien.Trim();
+
             request.TrangThai = string.IsNullOrWhiteSpace(request.TrangThai)
-                ? "Can lam"
+                ? StatusTodo
                 : request.TrangThai.Trim();
+
             request.TienDo ??= 0;
         }
 
@@ -264,12 +282,15 @@ namespace Application.Features.Tasks
         {
             request.TenCongViec = request.TenCongViec?.Trim() ?? string.Empty;
             request.MaCongViecCode = request.MaCongViecCode?.Trim();
+
             request.DoUuTien = string.IsNullOrWhiteSpace(request.DoUuTien)
-                ? "Trung binh"
+                ? PriorityMedium
                 : request.DoUuTien.Trim();
+
             request.TrangThai = string.IsNullOrWhiteSpace(request.TrangThai)
-                ? "Can lam"
+                ? StatusTodo
                 : request.TrangThai.Trim();
+
             request.TienDo ??= 0;
         }
 
@@ -367,8 +388,7 @@ namespace Application.Features.Tasks
 
         private static bool IsDoneStatus(string? status)
         {
-            return string.Equals(status, "Done", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(status, "Hoàn thành", StringComparison.OrdinalIgnoreCase);
+            return IsSameValue(status, StatusDone);
         }
 
         private static int CalculateRisk(
@@ -403,17 +423,15 @@ namespace Application.Features.Tasks
                 }
             }
 
-            if (string.Equals(priority, "Khẩn cấp", StringComparison.OrdinalIgnoreCase))
+            if (IsSameValue(priority, PriorityUrgent))
             {
                 score += 35;
             }
-            else if (string.Equals(priority, "High", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(priority, "Cao", StringComparison.OrdinalIgnoreCase))
+            else if (IsSameValue(priority, PriorityHigh))
             {
                 score += 25;
             }
-            else if (string.Equals(priority, "Medium", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(priority, "Trung bình", StringComparison.OrdinalIgnoreCase))
+            else if (IsSameValue(priority, PriorityMedium))
             {
                 score += 10;
             }
@@ -445,6 +463,14 @@ namespace Application.Features.Tasks
             }
 
             return "Low";
+        }
+
+        private static bool IsSameValue(string? value, string expected)
+        {
+            return string.Equals(
+                value?.Trim(),
+                expected,
+                StringComparison.OrdinalIgnoreCase);
         }
     }
 
