@@ -3,13 +3,16 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 
+# ============================================================
+# XGBoost — Dự báo trễ hạn
+# ============================================================
+
 class TaskRiskRequest(BaseModel):
     SoGioUocTinh: float = Field(..., ge=0, description="Số giờ ước tính hoàn thành task")
     SoNamKinhNghiemNhanSu: float = Field(..., ge=0, le=50, description="Số năm kinh nghiệm người phụ trách")
-    KhoiLuongHienTaiNhanSu: float = Field(..., ge=0, description="Khối lượng công việc hiện tại của nhân sự")
-    SoCongViecPhuThuocTruoc: int = Field(..., ge=0, description="Số task phải hoàn thành trước task này")
-    DoUuTien_Encoded: int = Field(..., ge=0, le=3, description="Độ ưu tiên đã mã hóa: 0=Thấp,1=Trung bình,2=Cao,3=Khẩn cấp")
-
+    KhoiLuongHienTaiNhanSu: float = Field(..., ge=0, le=1, description="Khối lượng hiện tại (0-1)")
+    SoCongViecPhuThuocTruoc: float = Field(..., ge=0, description="Số task phải xong trước task này")
+    DoUuTien_Encoded: float = Field(..., ge=0, le=3, description="Độ ưu tiên: 0=Thấp, 1=TB, 2=Cao, 3=Khẩn")
 
 class TaskRiskResponse(BaseModel):
     xac_suat_tre_han: float
@@ -17,30 +20,38 @@ class TaskRiskResponse(BaseModel):
     muc_do_rui_ro: str
 
 
+# ============================================================
+# Random Forest — Đề xuất giao việc
+# ============================================================
+
 class StaffMatchRequest(BaseModel):
-    do_phuc_tap: float = Field(0.5, ge=0, le=1, description="Độ phức tạp ước lượng của task (0-1)")
-    top_n: int = Field(5, ge=1, le=100, description="Số lượng nhân sự phù hợp nhất cần trả về")
+    SoGioUocTinh: float = Field(..., ge=0, description="Số giờ ước tính task")
+    PhanTramTaiNhanSu: float = Field(..., ge=0, le=1, description="% khối lượng nhân sự đang bận (0-1)")
+    DiemChatLuongTrungBinhLichSu: float = Field(..., ge=0, le=10, description="Điểm chất lượng trung bình lịch sử (0-10)")
+
+class StaffMatchResponse(BaseModel):
+    xac_suat_hieu_qua: float
+    de_xuat_giao_viec: bool
+    muc_do_phu_hop: str
 
 
-class StaffMatchResult(BaseModel):
-    MaNguoiDung: int
-    HoTen: str
-    diem_phu_hop: float
-    phan_tram_tai_hien_tai: float
-
+# ============================================================
+# GNN — Phát hiện điểm nghẽn
+# ============================================================
 
 class BottleneckResult(BaseModel):
     MaCongViec: int
-    trang_thai: Optional[str] = None
-    so_task_phu_thuoc_vao_no: int
-    diem_trung_tam: float
-    diem_bottleneck: float
+    SoTaskBiAnhHuongPhiaSau: int
+    bottleneck_score: float
 
+
+# ============================================================
+# Chat
+# ============================================================
 
 class ChatRequest(BaseModel):
     message: str
     history: list[dict] = []
-
 
 class ChatResponse(BaseModel):
     reply: str
