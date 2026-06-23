@@ -1,67 +1,234 @@
 """
-Chấm điểm độ phù hợp giữa nhân sự và task — dùng dữ liệu thật từ SQL Server.
-Có thể nâng cấp thành model học máy thật khi tích lũy đủ dữ liệu từ
-view v_Dataset_DeXuatGiaoViec (đã có sẵn label Nhan_GiaoViecHieuQua).
+Train mô hình Random Forest chấm điểm độ phù hợp nhân sự.
+Dùng dữ liệu đã xử lý từ clean_data.py (assignment_train.csv, assignment_test.csv)
 
 Chạy: python -m src.models.staff_matching
 """
-from email.policy import default
 
 import pandas as pd
+import joblib
+import numpy as np
 from pathlib import Path
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    classification_report,
+    roc_auc_score,
+    roc_curve,
+)
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 
+# ============================================================
+# ĐƯỜNG DẪN
+# ============================================================
 PROCESSED_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
+MODEL_DIR     = Path(__file__).resolve().parent.parent.parent / "models"
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+# ============================================================
+# CẤU HÌNH
+# ============================================================
+FEATURE_COLS = [
+    "SoGioUocTinh",
+    "PhanTramTaiNhanSu",
+    "DiemChatLuongTrungBinhLichSu",
+]
+LABEL_COL = "Nhan_GiaoViecHieuQua"
 
 
-def calculate_fit_score(nhan_su_row: dict, do_phuc_tap: float = 0.5) -> dict:
+# ============================================================
+# TRAIN MODEL
+# ============================================================
+
+def train():
+    print("=" * 60)
+    print("TRAIN MODEL — Random Forest Đề Xuất Giao Việc")
+    print("=" * 60)
+
+    # --------------------------------------------------------
+    # 1. ĐỌC DỮ LIỆU
+    # --------------------------------------------------------
+    print("\n📌 [1/4] Đọc dữ liệu...")
+    train_df = pd.read_csv(PROCESSED_DIR / "assignment_train.csv")
+    test_df  = pd.read_csv(PROCESSED_DIR / "assignment_test.csv")
+
+    X_train = train_df[FEATURE_COLS]
+    y_train = train_df[LABEL_COL]
+    X_test  = test_df[FEATURE_COLS]
+    y_test  = test_df[LABEL_COL]
+
+    print(f"   Train: {len(X_train)} dòng | Test: {len(X_test)} dòng")
+    print(f"   Train label: {dict(y_train.value_counts())}")
+    print(f"   Test label:  {dict(y_test.value_counts())}")
+
+    # --------------------------------------------------------
+    # 2. ĐỊNH NGHĨA MODEL RANDOM FOREST
+    # --------------------------------------------------------
+    print("\n📌 [2/4] Cấu hình Random Forest...")
+
     """
-    Công thức chấm điểm phù hợp (0-100) dựa trên dữ liệu bảng NguoiDung:
-    - 50%: hiệu suất lịch sử (ước lượng qua kinh nghiệm vì chưa join điểm đánh giá)
-    - 30%: kinh nghiệm phù hợp độ phức tạp task
-    - 20%: nghịch đảo phần trăm tải hiện tại (workload thấp -> điểm cao)
+    Giải thích tham số:
+    - n_estimators:   số cây quyết định (200 cây)
+    - max_depth:      độ sâu tối đa mỗi cây (tránh overfitting)
+    - min_samples_split: tối thiểu bao nhiêu mẫu để chia nhánh
+    - min_samples_leaf:  tối thiểu bao nhiêu mẫu ở lá
+    - max_features:   số feature xem xét mỗi lần chia ('sqrt' = căn bậc 2)
+    - class_weight:   tự động cân bằng class theo tỉ lệ
+    - random_state:   cố định kết quả
+    - n_jobs:         dùng tất cả CPU core
     """
-    # so_nam_kinh_nghiem = nhan_su_row.get("SoNamKinhNghiem") or 0
-    # khoi_luong_hien_tai = nhan_su_row.get("KhoiLuongHienTai") or 0
-    # khoi_luong_toi_da = nhan_su_row.get("KhoiLuongToiDa") or 1
-    def numeric_or_default(value, default):
-        return default if value is None or pd.isna(value) else value
+    model = RandomForestClassifier(
+        n_estimators     = 200,
+        max_depth        = 6,
+        min_samples_split= 5,
+        min_samples_leaf = 2,
+        max_features     = 'sqrt',
+        class_weight     = 'balanced',
+        random_state     = 42,
+        n_jobs           = -1,
+    )
 
-    so_nam_kinh_nghiem = numeric_or_default(nhan_su_row.get("SoNamKinhNghiem"), 0)
-    khoi_luong_hien_tai = numeric_or_default(nhan_su_row.get("KhoiLuongHienTai"), 0)
-    khoi_luong_toi_da = numeric_or_default(nhan_su_row.get("KhoiLuongToiDa"), 1)
+    print(f"   Tham số Random Forest:")
+    print(f"     n_estimators:      200")
+    print(f"     max_depth:         6")
+    print(f"     min_samples_split: 5")
+    print(f"     min_samples_leaf:  2")
+    print(f"     max_features:      sqrt")
+    print(f"     class_weight:      balanced")
+
+    # --------------------------------------------------------
+    # 3. CROSS-VALIDATION
+    # --------------------------------------------------------
+    print("\n📌 [3/4] Cross-Validation (5-fold)...")
+
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(
+        model, X_train, y_train,
+        cv=skf, scoring="roc_auc", n_jobs=-1
+    )
+
+    print(f"   ROC-AUC mỗi fold: {[round(s, 3) for s in cv_scores]}")
+    print(f"   ROC-AUC trung bình: {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
+
+    # --------------------------------------------------------
+    # 4. TRAIN CHÍNH THỨC + ĐÁNH GIÁ
+    # --------------------------------------------------------
+    print("\n📌 [4/4] Train chính thức...")
+    model.fit(X_train, y_train)
+
+    y_pred  = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+
+    print("\n=== KẾT QUẢ ĐÁNH GIÁ ===")
+    print(classification_report(
+        y_test, y_pred,
+        target_names=["Không hiệu quả", "Hiệu quả"]
+    ))
+    roc_auc = roc_auc_score(y_test, y_proba)
+    print(f"ROC-AUC: {roc_auc:.3f}")
+
+    # Đánh giá chất lượng
+    if roc_auc >= 0.85:
+        print("✅ Model TỐT — ROC-AUC ≥ 0.85")
+    elif roc_auc >= 0.70:
+        print("⚠️  Model TRUNG BÌNH — ROC-AUC 0.70-0.85")
+    else:
+        print("❌ Model YẾU — ROC-AUC < 0.70")
+
+    # Tìm ngưỡng tối ưu
+    fpr, tpr, thresholds = roc_curve(y_test, y_proba)
+    optimal_idx       = np.argmax(tpr - fpr)
+    optimal_threshold = thresholds[optimal_idx]
+    print(f"\nNgưỡng tối ưu: {optimal_threshold:.3f}")
+
+    y_pred_optimal = (y_proba >= optimal_threshold).astype(int)
+    print("\n=== KẾT QUẢ VỚI NGƯỠNG TỐI ƯU ===")
+    print(classification_report(
+        y_test, y_pred_optimal,
+        target_names=["Không hiệu quả", "Hiệu quả"]
+    ))
+
+    # --------------------------------------------------------
+    # 5. FEATURE IMPORTANCE
+    # --------------------------------------------------------
+    print("\n=== MỨC ĐỘ QUAN TRỌNG TỪNG ĐẶC TRƯNG ===")
+    importance = sorted(
+        zip(FEATURE_COLS, model.feature_importances_),
+        key=lambda x: -x[1]
+    )
+    for name, score in importance:
+        bar = "█" * int(score * 50)
+        print(f"  {name:<40} {bar} {score:.3f}")
+
+    # --------------------------------------------------------
+    # 6. LƯU MODEL
+    # --------------------------------------------------------
+    model_path    = MODEL_DIR / "staff_matching_model.joblib"
+    metadata_path = MODEL_DIR / "staff_matching_metadata.joblib"
+
+    joblib.dump(model, model_path)
+    print(f"\n✅ Model lưu tại: {model_path}")
+
+    metadata = {
+        "feature_cols":      FEATURE_COLS,
+        "label_col":         LABEL_COL,
+        "roc_auc":           round(roc_auc, 4),
+        "cv_roc_auc_mean":   round(cv_scores.mean(), 4),
+        "cv_roc_auc_std":    round(cv_scores.std(), 4),
+        "optimal_threshold": round(float(optimal_threshold), 4),
+        "n_train":           len(X_train),
+        "n_test":            len(X_test),
+    }
+    joblib.dump(metadata, metadata_path)
+    print(f"✅ Metadata lưu tại: {metadata_path}")
+
+    return model, optimal_threshold
 
 
-    exp_score = min(so_nam_kinh_nghiem / 10, 1.0) * (0.5 + do_phuc_tap * 0.5)
-    phan_tram_tai = khoi_luong_hien_tai / khoi_luong_toi_da if khoi_luong_toi_da else 1
-    workload_score = max(0, 1 - phan_tram_tai)
+# ============================================================
+# PREDICT — dùng khi API gọi
+# ============================================================
 
-    fit_score = (
-        0.50 * min(so_nam_kinh_nghiem / 10, 1.0)
-        + 0.30 * exp_score
-        + 0.20 * workload_score
-    ) * 100
+def predict_staff_match(task_features: dict, model=None, threshold=None) -> dict:
+    """
+    Dự báo việc giao task cho dev có hiệu quả không.
+
+    Input: dict với các key trong FEATURE_COLS
+    Ví dụ:
+      {
+        "SoGioUocTinh": 16,
+        "PhanTramTaiNhanSu": 0.4,
+        "DiemChatLuongTrungBinhLichSu": 8.5
+      }
+
+    Output: dict với xác suất và đề xuất
+    """
+    # Load scaler
+    scaler_path = MODEL_DIR / "assignment_pipeline_scaler.joblib"
+    scaler      = joblib.load(scaler_path)
+
+    # Load model + metadata
+    if model is None:
+        model = joblib.load(MODEL_DIR / "staff_matching_model.joblib")
+
+    metadata = joblib.load(MODEL_DIR / "staff_matching_metadata.joblib")
+    if threshold is None:
+        threshold = metadata["optimal_threshold"]
+
+    # Chuẩn hóa input
+    X_raw    = pd.DataFrame([task_features])[FEATURE_COLS]
+    X_scaled = scaler.transform(X_raw)
+    X        = pd.DataFrame(X_scaled, columns=FEATURE_COLS)
+
+    proba = model.predict_proba(X)[0, 1]
+    label = int(proba >= threshold)
 
     return {
-        "MaNguoiDung": nhan_su_row["MaNguoiDung"],
-        "HoTen": nhan_su_row.get("HoTen", ""),
-        "diem_phu_hop": round(fit_score, 2),
-        "phan_tram_tai_hien_tai": round(phan_tram_tai * 100, 1),
+        "xac_suat_hieu_qua":  round(float(proba), 4),
+        "de_xuat_giao_viec":  bool(label),
+        "muc_do_phu_hop":     "Cao" if proba > 0.7 else (
+                              "Trung bình" if proba > 0.4 else "Thấp"),
     }
 
 
-def rank_candidates(do_phuc_tap: float = 0.5, top_n: int = 5) -> list:
-    """Xếp hạng top N nhân sự phù hợp nhất (đang hoạt động) cho 1 task."""
-    nhan_su_df = pd.read_csv(PROCESSED_DIR / "nhan_su_clean.csv")
-
-    scores = [
-        calculate_fit_score(row.to_dict(), do_phuc_tap)
-        for _, row in nhan_su_df.iterrows()
-    ]
-    scores_sorted = sorted(scores, key=lambda x: x["diem_phu_hop"], reverse=True)
-    return scores_sorted[:top_n]
-
-
 if __name__ == "__main__":
-    result = rank_candidates(do_phuc_tap=0.7, top_n=5)
-    for r in result:
-        print(r)
+    train()
