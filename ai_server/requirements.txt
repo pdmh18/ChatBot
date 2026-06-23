@@ -9,3 +9,5 @@ networkx==3.4.2
 joblib==1.4.2
 python-dotenv==1.0.1
 pyodbc==5.2.0
+torch==2.2.2
+torch_geometric==2.5.3
