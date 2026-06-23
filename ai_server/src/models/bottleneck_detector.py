@@ -58,17 +58,16 @@ def load_graph_data(fit_artifacts: bool = True):
 
     # Encode TrangThaiHienTai
     encoder_path = MODEL_DIR / "gnn_status_encoder.joblib"
+    status_values = node_df["TrangThaiHienTai"].fillna("Unknown").astype(str)
     if fit_artifacts:
         le = LabelEncoder()
-        node_df["TrangThaiHienTai_Encoded"] = le.fit_transform(
-            node_df["TrangThaiHienTai"].fillna("Unknown")
-        )
+        le.fit(pd.concat([status_values, pd.Series(["Unknown"])]))
+        node_df["TrangThaiHienTai_Encoded"] = le.transform(status_values)
         joblib.dump(le, encoder_path)
     else:
         le = joblib.load(encoder_path)
-        node_df["TrangThaiHienTai_Encoded"] = le.transform(
-            node_df["TrangThaiHienTai"].fillna("Unknown")
-        )
+        status_values = status_values.where(status_values.isin(le.classes_), "Unknown")
+        node_df["TrangThaiHienTai_Encoded"] = le.transform(status_values)
 
     # Fill null
     node_df["SoGioUocTinh"] = node_df["SoGioUocTinh"].fillna(
@@ -185,14 +184,33 @@ def train():
     data, node_df, scaler = load_graph_data()
 
     # Chia train/test mask (80/20)
-    num_nodes = data.num_nodes
-    indices   = np.arange(num_nodes)
+    num_nodes    = data.num_nodes
+    labels_np    = data.y.numpy()
+    label_counts = pd.Series(labels_np).value_counts()
+
+    if len(label_counts) < 2:
+        raise ValueError(f"GNN cần ít nhất 2 class để train: {dict(label_counts)}")
+    if label_counts.min() < 2:
+        raise ValueError(
+            f"GNN cần ít nhất 2 node mỗi class để stratified split: "
+            f"{dict(label_counts)}"
+        )
+
+    n_test  = int(np.ceil(0.2 * num_nodes))
+    n_train = num_nodes - n_test
+    if n_test < len(label_counts) or n_train < len(label_counts):
+        raise ValueError(
+            f"Không đủ node để stratified split: train={n_train}, "
+            f"test={n_test}, classes={len(label_counts)}"
+        )
+
+    indices = np.arange(num_nodes)
     train_idx, test_idx = train_test_split(
         indices,
         test_size=0.2,
         random_state=42,
-        stratify=data.y.numpy(),
-    )
+        stratify=labels_np,
+)
 
     train_mask = torch.zeros(num_nodes, dtype=torch.bool)
     test_mask  = torch.zeros(num_nodes, dtype=torch.bool)
