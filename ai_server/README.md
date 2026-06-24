@@ -1,98 +1,217 @@
-# AI Server — Dự báo rủi ro & tối ưu nguồn lực dự án phần mềm
+# AI Server — Dự Báo Rủi Ro & Tối Ưu Nguồn Lực Dự Án
 
-## 🚀 Hướng dẫn cho người mới clone về (làm theo đúng thứ tự)
-
-### Yêu cầu trước
-- Đã cài **Python 3.12** (không dùng 3.13/3.14 vì pandas/xgboost chưa có wheel sẵn, sẽ lỗi build)
-- Kiểm tra: `py -3.12 --version`
-
-### Bước 1 — Vào đúng thư mục
-```powershell
-cd ai_server
-```
-
-### Bước 2 — Tạo môi trường ảo (venv)
-```powershell
-py -3.12 -m venv .venv
-.venv\Scripts\activate
-```
-> Sau khi activate, đầu dòng lệnh sẽ hiện `(.venv)` — nếu không thấy nghĩa là chưa activate đúng.
-
-### Bước 3 — Cài thư viện
-```powershell
-pip install -r requirements.txt
-```
-
-### Bước 4 — Sinh dữ liệu giả lập (synthetic data)
-```powershell
-python -m src.preprocessing.generate_synthetic_data
-```
-Tạo ra 3 file CSV trong `data/raw/`: `nhan_su.csv`, `cong_viec.csv`, `phu_thuoc_cong_viec.csv`
-
-### Bước 5 — Tiền xử lý & chuẩn hóa dữ liệu
-```powershell
-python -m src.preprocessing.clean_data
-```
-Làm sạch + chuẩn hóa (Min-Max) → lưu vào `data/processed/`, lưu `scaler.joblib` vào `models/`
-
-### Bước 6 — Train model dự báo trễ hạn (XGBoost)
-```powershell
-python -m src.models.train_risk_model
-```
-In ra báo cáo độ chính xác (precision/recall/ROC-AUC) → lưu `risk_model.joblib` vào `models/`
-
-### Bước 7 — (Tùy chọn) Test riêng từng module AI
-```powershell
-python -m src.models.staff_matching        # chấm điểm phù hợp nhân sự
-python -m src.models.bottleneck_detector    # tìm điểm nghẽn dự án
-```
-
-### Bước 8 — Chạy API server
-```powershell
-uvicorn src.api.main:app --reload --port 8000
-```
-
-Vào trình duyệt: **http://127.0.0.1:8000/docs** để xem & test toàn bộ API qua Swagger UI.
+API AI gồm 3 model:
+- **XGBoost** — Dự báo task có nguy cơ trễ hạn
+- **Random Forest** — Chấm điểm độ phù hợp nhân sự
+- **GNN** — Phát hiện điểm nghẽn trong đồ thị công việc
 
 ---
 
-## ⚠️ Lưu ý quan trọng
-- **Bước 4, 5, 6 bắt buộc chạy trước** khi gọi API `/api/predict-risk` và `/api/analyze-bottleneck`, nếu không sẽ báo lỗi thiếu model/data.
-- Mỗi lần mở terminal mới để chạy lại project, phải `activate` venv lại:
-  ```powershell
-  .venv\Scripts\activate
-  ```
-- File trong `data/raw/`, `data/processed/`, `models/*.joblib` **không được commit lên Git** (đã có trong `.gitignore`) vì là dữ liệu sinh ra, người khác clone về tự chạy lại bước 4-6 là có.
+## Yêu cầu hệ thống
 
-## Cấu trúc
+- Python **3.10+**
+- Windows 10/11 (đã test)
+- RAM tối thiểu 4GB
+
+---
+
+## Cài đặt
+
+### Bước 1 — Clone project và tạo môi trường ảo
+
+```bash
+cd ai_server
+python -m venv .venv
+```
+
+Kích hoạt môi trường ảo:
+```bash
+# Windows
+.venv\Scripts\activate
+
+# Mac/Linux
+source .venv/bin/activate
+```
+
+### Bước 2 — Cài thư viện cơ bản
+
+```bash
+pip install -r requirements.txt
+```
+
+### Bước 3 — Cài thêm PyTorch (CPU)
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+### Bước 4 — Cài PyTorch Geometric
+
+```bash
+pip install torch-geometric
+pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.12.1+cpu.html
+```
+
+### Bước 5 — Cài thêm thư viện còn lại
+
+```bash
+pip install imbalanced-learn matplotlib
+```
+
+---
+
+## Cấu hình
+
+Tạo file `.env` trong thư mục `ai_server/` (copy từ `.env.example`):
+
+```env
+DB_SERVER=localhost\SQLEXPRESS
+DB_NAME=QuanLyDuAn_AI
+DB_DRIVER=ODBC Driver 18 for SQL Server
+DB_TRUSTED_CONNECTION=yes
+DB_TRUST_SERVER_CERTIFICATE=yes
+DB_USERNAME=
+DB_PASSWORD=
+```
+
+---
+
+## Chuẩn bị dữ liệu
+
+Copy 3 file CSV vào thư mục `data/raw/`:
 
 ```
-ai_server/
-├── data/
-│   ├── raw/            ← dữ liệu thô (synthetic hoặc thật)
-│   └── processed/      ← dữ liệu đã làm sạch + chuẩn hóa
-├── src/
-│   ├── preprocessing/  ← sinh data giả + clean/normalize
-│   ├── models/         ← train + inference (risk, staff matching, bottleneck/GNN)
-│   ├── api/             ← FastAPI app, routes, schemas
-│   └── utils/
-├── models/              ← model đã train (.joblib) — không commit lên git
-└── notebooks/            ← Jupyter để EDA / thử nghiệm
+data/raw/
+  ├── dataset_du_bao_tre_han.csv
+  ├── dataset_de_xuat_giao_viec.csv
+  └── dataset_phat_hien_diem_nghen.csv
 ```
+
+---
+
+## Chạy theo thứ tự
+
+### Bước 1 — Tiền xử lý dữ liệu
+```bash
+python -m src.preprocessing.clean_data
+```
+
+Kết quả: sinh ra các file CSV trong `data/processed/` và scaler trong `models/`
+
+### Bước 2 — Train XGBoost (dự báo trễ hạn)
+```bash
+python -m src.models.train_risk_model
+```
+
+Kết quả: `models/risk_model.joblib`
+
+### Bước 3 — Train Random Forest (đề xuất giao việc)
+```bash
+python -m src.models.staff_matching
+```
+
+Kết quả: `models/staff_matching_model.joblib`
+
+### Bước 4 — Train GNN (phát hiện điểm nghẽn)
+```bash
+python -m src.models.bottleneck_detector
+```
+
+Kết quả: `models/gnn_model.pt`
+
+### Bước 5 — Chạy API Server
+```bash
+uvicorn src.api.main:app --reload --port 8000
+```
+
+Truy cập docs tại: `http://localhost:8000/docs`
+
+---
 
 ## API Endpoints
 
 | Method | Endpoint | Mô tả |
-|---|---|---|
-| POST | `/api/predict-risk` | Dự báo xác suất task trễ hạn |
-| POST | `/api/match-staff` | Xếp hạng nhân sự phù hợp cho task |
-| GET | `/api/analyze-bottleneck` | Phân tích điểm nghẽn dự án (graph) |
-| POST | `/api/chat` | Chat placeholder |
-| GET | `/health` | Health check |
+|--------|----------|-------|
+| POST | `/api/predict-risk` | Dự báo task trễ hạn (XGBoost) |
+| POST | `/api/match-staff` | Đề xuất giao việc (Random Forest) |
+| GET | `/api/analyze-bottleneck` | Phát hiện điểm nghẽn (GNN) |
+| POST | `/api/chat` | Chatbot hỗ trợ |
+| GET | `/health` | Kiểm tra server |
 
-## Roadmap nâng cấp
+---
 
-- [ ] Thay synthetic data bằng dữ liệu thật từ Jira/GitHub
-- [ ] Nâng `bottleneck_detector.py` từ graph-centrality lên GNN thực sự (PyTorch Geometric)
-- [ ] Thêm model RandomForest để so sánh với XGBoost
-- [ ] Tích hợp LLM thật vào `/api/chat`
+## Ví dụ gọi API từ Backend C#
+
+### Dự báo trễ hạn
+```csharp
+var response = await httpClient.PostAsJsonAsync(
+    "http://localhost:8000/api/predict-risk",
+    new {
+        SoGioUocTinh = 35,
+        SoNamKinhNghiemNhanSu = 3,
+        KhoiLuongHienTaiNhanSu = 0.7,
+        SoCongViecPhuThuocTruoc = 2,
+        DoUuTien_Encoded = 2
+    }
+);
+// Kết quả: { xac_suat_tre_han: 0.74, du_bao_tre_han: true, muc_do_rui_ro: "Cao" }
+```
+
+### Đề xuất giao việc
+```csharp
+var response = await httpClient.PostAsJsonAsync(
+    "http://localhost:8000/api/match-staff",
+    new {
+        SoGioUocTinh = 16,
+        PhanTramTaiNhanSu = 0.4,
+        DiemChatLuongTrungBinhLichSu = 8.5
+    }
+);
+// Kết quả: { xac_suat_hieu_qua: 0.54, de_xuat_giao_viec: true, muc_do_phu_hop: "Trung bình" }
+```
+
+### Phát hiện điểm nghẽn
+```csharp
+var response = await httpClient.GetAsync(
+    "http://localhost:8000/api/analyze-bottleneck?top_n=10"
+);
+// Kết quả: danh sách 10 task có bottleneck_score cao nhất
+```
+
+---
+
+## Cấu trúc thư mục
+
+```
+ai_server/
+├── data/
+│   ├── raw/          ← 3 file CSV đầu vào
+│   └── processed/    ← CSV đã tiền xử lý (tự sinh)
+├── models/           ← model đã train (tự sinh)
+├── src/
+│   ├── preprocessing/
+│   │   ├── clean_data.py        ← tiền xử lý dữ liệu
+│   │   └── db_connector.py      ← kết nối SQL Server
+│   ├── models/
+│   │   ├── train_risk_model.py  ← XGBoost
+│   │   ├── staff_matching.py    ← Random Forest
+│   │   └── bottleneck_detector.py ← GNN
+│   └── api/
+│       ├── main.py              ← FastAPI entry point
+│       ├── schemas.py           ← request/response models
+│       └── routes/
+│           ├── risk.py          ← AI endpoints
+│           └── chat.py          ← chat endpoint
+├── .env                         ← cấu hình DB (tự tạo)
+├── .env.example                 ← mẫu cấu hình
+├── requirements.txt             ← thư viện cơ bản
+└── README.md
+```
+
+---
+
+## Lưu ý
+
+- Phải chạy **đúng thứ tự** Bước 1 → 2 → 3 → 4 → 5
+- Nếu thay đổi dữ liệu CSV → chạy lại từ Bước 1
+- File `.env` không được commit lên Git
