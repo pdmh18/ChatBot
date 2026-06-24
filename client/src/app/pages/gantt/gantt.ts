@@ -1,4 +1,4 @@
-﻿import { AfterViewInit, Component } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component } from '@angular/core';
 import FrappeGantt from 'frappe-gantt';
 import { Task } from '../../models/task';
 import { TaskService } from '../../services/task';
@@ -12,7 +12,10 @@ import { TaskService } from '../../services/task';
 export class Gantt implements AfterViewInit {
   emptyMessage = 'Đang tải dữ liệu Gantt từ backend API...';
 
-  constructor(private taskService: TaskService) {}
+  constructor(
+    private taskService: TaskService,
+    private changeDetector: ChangeDetectorRef,
+  ) {}
 
   ngAfterViewInit(): void {
     this.taskService.getTaskViews({ pageNumber: 1, pageSize: 100 }).subscribe({
@@ -39,6 +42,8 @@ export class Gantt implements AfterViewInit {
     }
 
     this.emptyMessage = '';
+    this.changeDetector.detectChanges();
+
     new FrappeGantt('#gantt', ganttTasks);
   }
 
@@ -67,7 +72,17 @@ export class Gantt implements AfterViewInit {
     if (!year || !month || !day) return null;
 
     const date = new Date(year, month - 1, day);
-    return Number.isNaN(date.getTime()) ? null : date;
+
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return null;
+    }
+
+    return date;
   }
 
   private formatLocalDate(date: Date): string {

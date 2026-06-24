@@ -172,21 +172,45 @@
       </header>
 
       <div class="developer-list">
+        @if (aiSuggestionMessage) {
+          <div class="ai-message">{{ aiSuggestionMessage }}</div>
+        }
+
         @for (developer of suggestedDevelopers; track developer.id) {
           <div class="developer-card">
             <div>
               <strong>{{ developer.name }}</strong>
+              @if (developer.model) {
+                <small>{{ developer.model }}</small>
+              }
               <p>{{ developer.reason }}</p>
             </div>
 
             <div class="developer-score">
               <span>{{ developer.score }}%</span>
-              <small>Workload {{ developer.workload }}%</small>
+              <small>Tải hiện tại {{ developer.workload }}%</small>
+              @if (developer.skillScore !== undefined && developer.skillScore !== null) {
+                <small>Kỹ năng {{ developer.skillScore }}</small>
+              }
+              @if (developer.experienceScore !== undefined && developer.experienceScore !== null) {
+                <small>Kinh nghiệm {{ developer.experienceScore }}</small>
+              }
             </div>
 
-            <button type="button" (click)="assignDeveloper(developer)">
+            <button type="button" [disabled]="isSuggestionLoading" (click)="assignDeveloper(developer)">
               Chọn
             </button>
+          </div>
+        }
+
+        @if (riskResult) {
+          <div class="risk-result-card" [class.danger]="riskResult.duBaoTreHan">
+            <strong>
+              {{ riskResult.duBaoTreHan ? 'Task có nguy cơ trễ hạn' : 'Nguy cơ trễ hạn thấp' }}
+            </strong>
+            <p>Xác suất: {{ getRiskPercent(riskResult) }}%</p>
+            <p>Mức độ: {{ riskResult.mucDoRuiRo }}</p>
+            <small>{{ riskResult.khuyenNghi || riskResult.tacDongDuBao }}</small>
           </div>
         }
       </div>
