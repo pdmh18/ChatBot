@@ -60,9 +60,12 @@ if __name__ == "__main__":
     print("Nhấn CTRL+C để dừng server")
     print('='*60)
 
-    subprocess.run([
+    run_step(
+    "Khởi động FastAPI Server",
+    [
         python, "-m", "uvicorn",
         "src.api.main:app",
         "--reload",
-        "--port", "8000"
-    ])
+        "--port", "8000",
+    ],
+)
