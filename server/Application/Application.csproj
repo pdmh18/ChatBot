@@ -20,7 +20,6 @@
     <Folder Include="Common\DTOs\Kanban\" />
     <Folder Include="Common\DTOs\Gantt\" />
     <Folder Include="Common\DTOs\Alerts\" />
-    <Folder Include="Common\DTOs\Task\" />
     <Folder Include="Common\Interfaces\" />
     <Folder Include="Common\Utils\" />
     <Folder Include="Features\Chat\Commands\" />

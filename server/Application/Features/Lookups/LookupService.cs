@@ -47,10 +47,15 @@ namespace Application.Features.Lookups
         {
             IReadOnlyList<LookupItemDto> statuses = new List<LookupItemDto>
         {
-            new() { Id = 1, Name = "Todo" },
-            new() { Id = 2, Name = "In Progress" },
-            new() { Id = 3, Name = "Review" },
-            new() { Id = 4, Name = "Done" }
+            new() { Id = 1, Name = "Can lam" },
+new() { Id = 2, Name = "Dang lam" },
+new() { Id = 3, Name = "Cho kiem tra" },
+new() { Id = 4, Name = "Hoan thanh" },
+new() { Id = 5, Name = "Bi chan" },
+new() { Id = 6, Name = "Cho duyet" },
+new() { Id = 7, Name = "Da duyet" },
+new() { Id = 8, Name = "Bi tu choi" },
+new() { Id = 9, Name = "Da huy" }
         };
 
             return Task.FromResult(statuses);
@@ -60,9 +65,10 @@ namespace Application.Features.Lookups
         {
             IReadOnlyList<LookupItemDto> priorities = new List<LookupItemDto>
         {
-            new() { Id = 1, Name = "Low" },
-            new() { Id = 2, Name = "Medium" },
-            new() { Id = 3, Name = "High" }
+            new() { Id = 1, Name = "Thap" },
+new() { Id = 2, Name = "Trung binh" },
+new() { Id = 3, Name = "Cao" },
+new() { Id = 4, Name = "Khan cap" }
         };
 
             return Task.FromResult(priorities);
