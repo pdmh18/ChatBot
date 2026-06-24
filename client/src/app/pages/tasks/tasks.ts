@@ -2,6 +2,7 @@
 import { FormsModule } from '@angular/forms';
 import { Observable, of } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
+import { RiskPredictionResult, StaffMatchResult } from '../../models/ai';
 import { LookupItemDto, SprintLookupDto, UserLookupDto } from '../../models/lookups.model';
 import {
   CreateTaskRequest,
@@ -12,6 +13,7 @@ import {
   getTaskStatusLabel,
 } from '../../models/task';
 import { LookupService } from '../../services/lookup.service';
+import { AiService } from '../../services/ai';
 import { TaskService } from '../../services/task';
 
 interface DeveloperSuggestion {
@@ -19,6 +21,9 @@ interface DeveloperSuggestion {
   name: string;
   score: number;
   workload: number;
+  skillScore?: number | null;
+  experienceScore?: number | null;
+  model?: string;
   reason: string;
 }
 
@@ -62,9 +67,13 @@ export class Tasks implements OnInit {
 
   newTask: Omit<Task, 'id'> = this.createEmptyTask();
   suggestedDevelopers: DeveloperSuggestion[] = [];
+  riskResult: RiskPredictionResult | null = null;
+  aiSuggestionMessage = '';
+  isSuggestionLoading = false;
 
   constructor(
     private lookupService: LookupService,
+    private aiService: AiService,
     private taskService: TaskService,
     private cdr: ChangeDetectorRef
   ) {}
@@ -200,27 +209,55 @@ export class Tasks implements OnInit {
 
   showAiSuggestion(task: Task): void {
     this.suggestionTask = task;
-    this.suggestedDevelopers = this.buildDeveloperSuggestions();
+    this.riskResult = null;
+    this.suggestedDevelopers = [];
+    this.aiSuggestionMessage = 'AI đang phân tích năng lực và tải công việc hiện tại...';
+    this.isSuggestionLoading = true;
     this.cdr.detectChanges();
+
+    this.aiService.suggestAssignees(task.id).subscribe({
+      next: (suggestions) => {
+        this.suggestedDevelopers = suggestions.map((item) => this.mapStaffMatchToSuggestion(item));
+        this.aiSuggestionMessage = this.suggestedDevelopers.length
+          ? ''
+          : 'AI chưa tìm được nhân sự phù hợp cho task này.';
+        this.isSuggestionLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        this.suggestedDevelopers = this.buildDeveloperSuggestions();
+        this.aiSuggestionMessage =
+          error?.error?.message ||
+          'Chưa gọi được API AI đề xuất nhân sự. Đang hiển thị gợi ý tạm từ dữ liệu người dùng.';
+        this.isSuggestionLoading = false;
+        this.cdr.detectChanges();
+      },
+    });
   }
 
   closeSuggestion(): void {
     this.suggestionTask = null;
+    this.riskResult = null;
+    this.aiSuggestionMessage = '';
+    this.isSuggestionLoading = false;
     this.cdr.detectChanges();
   }
 
   assignDeveloper(developer: DeveloperSuggestion): void {
     if (!this.suggestionTask) return;
 
+    this.aiSuggestionMessage = `Đang gán task cho ${developer.name}...`;
+    this.isSuggestionLoading = true;
+
     this.taskService.assignTask(this.suggestionTask.id, { maNguoiPhuTrach: developer.id }).subscribe({
       next: () => {
         this.successMessage = `Đã gán task "${this.suggestionTask?.name}" cho ${developer.name}.`;
-        this.closeSuggestion();
-        this.loadTasks();
+        this.predictRiskForSuggestion(this.suggestionTask!.id);
       },
       error: () => {
-        this.successMessage = 'Chưa phân công được task. Kiểm tra backend rồi thử lại.';
-        this.closeSuggestion();
+        this.aiSuggestionMessage = 'Chưa phân công được task. Kiểm tra backend rồi thử lại.';
+        this.isSuggestionLoading = false;
+        this.cdr.detectChanges();
       },
     });
   }
@@ -365,6 +402,51 @@ export class Tasks implements OnInit {
       workload: 45 + index * 10,
       reason: `Vai trò: ${user.vaiTro}. Phù hợp để nhận task theo dữ liệu người dùng từ backend.`,
     }));
+  }
+
+  private predictRiskForSuggestion(taskId: number): void {
+    this.aiSuggestionMessage = 'Đã gán người phụ trách. AI đang dự báo rủi ro trễ hạn...';
+
+    this.aiService.predictRisk(taskId).subscribe({
+      next: (risk) => {
+        this.riskResult = risk;
+        this.aiSuggestionMessage = '';
+        this.isSuggestionLoading = false;
+        this.loadTasks();
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        this.riskResult = null;
+        this.aiSuggestionMessage =
+          error?.error?.message ||
+          'Đã gán task, nhưng chưa dự báo được rủi ro AI. Bạn có thể thử lại sau.';
+        this.isSuggestionLoading = false;
+        this.loadTasks();
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  private mapStaffMatchToSuggestion(item: StaffMatchResult): DeveloperSuggestion {
+    return {
+      id: item.maNguoiDuocDeXuat,
+      name: item.hoTenNguoiDuocDeXuat,
+      score: this.toPercent(item.diemPhuHop),
+      workload: this.toPercent(item.diemKhoiLuong ?? 0),
+      skillScore: item.diemKyNang ?? null,
+      experienceScore: item.diemKinhNghiem ?? null,
+      model: item.tenMoHinh,
+      reason: item.lyDo || 'AI đề xuất dựa trên kỹ năng, tải công việc và kinh nghiệm lịch sử.',
+    };
+  }
+
+  getRiskPercent(item: RiskPredictionResult): number {
+    return this.toPercent(item.xacSuatRuiRo);
+  }
+
+  private toPercent(value: number): number {
+    if (value <= 1) return Math.round(value * 100);
+    return Math.round(value);
   }
 
   private getTodayString(): string {

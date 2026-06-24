@@ -1,5 +1,5 @@
-﻿.gantt-wrapper {
-  min-height: 420px;
+.gantt-wrapper {
+  min-height: 320px;
   padding: 16px;
   border: 1px solid #e1e5ea;
   border-radius: 8px;
@@ -10,10 +10,11 @@
 .gantt-empty {
   display: grid;
   place-items: center;
-  min-height: 220px;
+  min-height: 96px;
   border: 1px dashed #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
   color: #64748b;
   text-align: center;
+  margin-bottom: 12px;
 }

@@ -56,6 +56,15 @@
   border-left: 5px solid #16a34a;
 }
 
+.empty-card {
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  border: 1px dashed #b7c7e6;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #475569;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

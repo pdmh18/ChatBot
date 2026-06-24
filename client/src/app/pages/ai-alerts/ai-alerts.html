@@ -6,19 +6,28 @@
   @for (item of lateRisks; track item.id) {
     <div class="alert-card danger">
       <strong>{{ item.task }}</strong>
-      <p>Nguy cơ trễ hạn: {{ item.risk }}%</p>
+      <p>Nguy cơ trễ hạn: {{ getRiskPercent(item) }}%</p>
       <small>{{ item.reason }}</small>
     </div>
+  }
+
+  @if (!lateRisks.length) {
+    <div class="empty-card">Chưa có dữ liệu dự báo rủi ro. Hãy chạy AI dự báo từ màn hình Tasks.</div>
   }
 </section>
 
 <section class="alert-section">
   <h3>Phát hiện điểm nghẽn</h3>
 
-  @for (item of bottlenecks; track item.id) {
+  @if (aiMessage) {
+    <div class="empty-card">{{ aiMessage }}</div>
+  }
+
+  @for (item of bottleneckResults; track item.maDiemNghen) {
     <button type="button" class="alert-card warning" (click)="openBottleneckAlert(item)">
-      <strong>{{ item.task }}</strong>
-      <p>Đang chặn {{ item.blockedTasks }} task khác</p>
+      <strong>Task #{{ item.maCongViec || 'N/A' }}</strong>
+      <p>Mức độ: {{ item.mucDoNghiemTrong }}</p>
+      <small>{{ item.nguyenNhan || item.khuVucPhatHien }}</small>
     </button>
   }
 </section>
@@ -41,7 +50,7 @@
       <header class="modal-header warning-header">
         <div>
           <h3>Cảnh báo điểm nghẽn</h3>
-          <p>{{ selectedBottleneck.task }}</p>
+          <p>Task #{{ selectedBottleneck.maCongViec || 'N/A' }}</p>
         </div>
 
         <button type="button" (click)="closeBottleneckAlert()">X</button>
@@ -49,13 +58,20 @@
 
       <div class="modal-body">
         <p>
-          Task này đang chặn
-          <strong>{{ selectedBottleneck.blockedTasks }}</strong>
-          task khác trong dự án.
+          Mức độ nghiêm trọng:
+          <strong>{{ selectedBottleneck.mucDoNghiemTrong }}</strong>
         </p>
 
         <p>
-          AI đề xuất PM ưu tiên xử lý task này trước để tránh ảnh hưởng tiến độ sprint.
+          Nguyên nhân: {{ selectedBottleneck.nguyenNhan || selectedBottleneck.khuVucPhatHien }}
+        </p>
+
+        <p>
+          Khuyến nghị AI: {{ selectedBottleneck.khuyenNghiAI || 'PM nên ưu tiên kiểm tra task này để tránh ảnh hưởng tiến độ.' }}
+        </p>
+
+        <p>
+          Số ngày trễ dự báo: {{ selectedBottleneck.soNgayTreDuBao ?? 0 }}
         </p>
 
         <button type="button" (click)="closeBottleneckAlert()">
