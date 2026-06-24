@@ -1,6 +1,15 @@
+﻿.dashboard-message {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-top: 16px;
 }
@@ -24,11 +33,11 @@
 }
 
 .warning p {
-  color: orange;
+  color: #f59e0b;
 }
 
 .danger p {
-  color: red;
+  color: #dc2626;
 }
 
 .charts {
@@ -38,28 +47,7 @@
   margin-top: 24px;
 }
 
-.chart-card {
-  padding: 20px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-}
-
-.chart-card h3 {
-  margin: 0 0 16px;
-}
-
-.chart-card canvas {
-  max-height: 320px;
-}
-
-.insights {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin-top: 24px;
-}
-
+.chart-card,
 .insight-card {
   padding: 20px;
   background: white;
@@ -67,8 +55,36 @@
   border-radius: 8px;
 }
 
+.chart-card h3,
 .insight-card h3 {
   margin: 0 0 16px;
+}
+
+.chart-card canvas {
+  max-height: 320px;
+}
+
+.empty-chart,
+.empty-insight {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: center;
+}
+
+.empty-insight {
+  min-height: 76px;
+}
+
+.insights {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 24px;
 }
 
 .insight-row {
@@ -106,4 +122,12 @@
 .severity-badge {
   background: #fef3c7;
   color: #b45309;
+}
+
+@media (max-width: 1000px) {
+  .stats,
+  .charts,
+  .insights {
+    grid-template-columns: 1fr;
+  }
 }

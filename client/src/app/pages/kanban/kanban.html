@@ -1,11 +1,19 @@
 ﻿<h2>Kanban Board</h2>
 
+@if (message) {
+  <div class="kanban-message">{{ message }}</div>
+}
+
 <div class="kanban-board">
   <div class="kanban-column">
-    <h3>Todo</h3>
+    <div class="column-header">
+      <h3>Cần làm</h3>
+      <span>{{ todo.length }}</span>
+    </div>
 
     <div
       cdkDropList
+      id="todoList"
       #todoList="cdkDropList"
       [cdkDropListData]="todo"
       [cdkDropListConnectedTo]="[inProgressList, reviewList, doneList]"
@@ -15,31 +23,28 @@
       @for (task of todo; track task.id) {
         <div class="task-card" cdkDrag>
           <div class="task-title">{{ task.name }}</div>
-
-          <div class="task-meta">
-            <span>{{ task.assignee }}</span>
-            <span>{{ task.deadline }}</span>
-          </div>
-
+          <div class="task-meta"><span>{{ task.assignee }}</span><span>{{ task.deadline }}</span></div>
+          <div class="progress-line"><span [style.width.%]="task.progress ?? 0"></span></div>
           <div class="task-footer">
-            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
-              {{ task.priority }}
-            </span>
-
-            <span class="risk" [class.risky]="task.riskScore >= 70">
-              Risk {{ task.riskScore }}%
-            </span>
+            <span class="priority">{{ getPriorityLabel(task.priority) }}</span>
+            <span class="risk" [class.risky]="task.riskScore >= 70">Risk {{ task.riskScore }}%</span>
           </div>
         </div>
+      } @empty {
+        <div class="empty-column">Chưa có task</div>
       }
     </div>
   </div>
 
   <div class="kanban-column">
-    <h3>In Progress</h3>
+    <div class="column-header">
+      <h3>Đang làm</h3>
+      <span>{{ inProgress.length }}</span>
+    </div>
 
     <div
       cdkDropList
+      id="inProgressList"
       #inProgressList="cdkDropList"
       [cdkDropListData]="inProgress"
       [cdkDropListConnectedTo]="[todoList, reviewList, doneList]"
@@ -49,31 +54,28 @@
       @for (task of inProgress; track task.id) {
         <div class="task-card" cdkDrag>
           <div class="task-title">{{ task.name }}</div>
-
-          <div class="task-meta">
-            <span>{{ task.assignee }}</span>
-            <span>{{ task.deadline }}</span>
-          </div>
-
+          <div class="task-meta"><span>{{ task.assignee }}</span><span>{{ task.deadline }}</span></div>
+          <div class="progress-line"><span [style.width.%]="task.progress ?? 0"></span></div>
           <div class="task-footer">
-            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
-              {{ task.priority }}
-            </span>
-
-            <span class="risk" [class.risky]="task.riskScore >= 70">
-              Risk {{ task.riskScore }}%
-            </span>
+            <span class="priority">{{ getPriorityLabel(task.priority) }}</span>
+            <span class="risk" [class.risky]="task.riskScore >= 70">Risk {{ task.riskScore }}%</span>
           </div>
         </div>
+      } @empty {
+        <div class="empty-column">Chưa có task</div>
       }
     </div>
   </div>
 
   <div class="kanban-column">
-    <h3>Review</h3>
+    <div class="column-header">
+      <h3>Chờ kiểm tra</h3>
+      <span>{{ review.length }}</span>
+    </div>
 
     <div
       cdkDropList
+      id="reviewList"
       #reviewList="cdkDropList"
       [cdkDropListData]="review"
       [cdkDropListConnectedTo]="[todoList, inProgressList, doneList]"
@@ -83,31 +85,28 @@
       @for (task of review; track task.id) {
         <div class="task-card" cdkDrag>
           <div class="task-title">{{ task.name }}</div>
-
-          <div class="task-meta">
-            <span>{{ task.assignee }}</span>
-            <span>{{ task.deadline }}</span>
-          </div>
-
+          <div class="task-meta"><span>{{ task.assignee }}</span><span>{{ task.deadline }}</span></div>
+          <div class="progress-line"><span [style.width.%]="task.progress ?? 0"></span></div>
           <div class="task-footer">
-            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
-              {{ task.priority }}
-            </span>
-
-            <span class="risk" [class.risky]="task.riskScore >= 70">
-              Risk {{ task.riskScore }}%
-            </span>
+            <span class="priority">{{ getPriorityLabel(task.priority) }}</span>
+            <span class="risk" [class.risky]="task.riskScore >= 70">Risk {{ task.riskScore }}%</span>
           </div>
         </div>
+      } @empty {
+        <div class="empty-column">Chưa có task</div>
       }
     </div>
   </div>
 
   <div class="kanban-column">
-    <h3>Done</h3>
+    <div class="column-header">
+      <h3>Hoàn thành</h3>
+      <span>{{ done.length }}</span>
+    </div>
 
     <div
       cdkDropList
+      id="doneList"
       #doneList="cdkDropList"
       [cdkDropListData]="done"
       [cdkDropListConnectedTo]="[todoList, inProgressList, reviewList]"
@@ -117,22 +116,15 @@
       @for (task of done; track task.id) {
         <div class="task-card" cdkDrag>
           <div class="task-title">{{ task.name }}</div>
-
-          <div class="task-meta">
-            <span>{{ task.assignee }}</span>
-            <span>{{ task.deadline }}</span>
-          </div>
-
+          <div class="task-meta"><span>{{ task.assignee }}</span><span>{{ task.deadline }}</span></div>
+          <div class="progress-line"><span [style.width.%]="task.progress ?? 0"></span></div>
           <div class="task-footer">
-            <span class="priority" [class.high]="task.priority === 'High'" [class.medium]="task.priority === 'Medium'" [class.low]="task.priority === 'Low'">
-              {{ task.priority }}
-            </span>
-
-            <span class="risk" [class.risky]="task.riskScore >= 70">
-              Risk {{ task.riskScore }}%
-            </span>
+            <span class="priority">{{ getPriorityLabel(task.priority) }}</span>
+            <span class="risk" [class.risky]="task.riskScore >= 70">Risk {{ task.riskScore }}%</span>
           </div>
         </div>
+      } @empty {
+        <div class="empty-column">Chưa có task</div>
       }
     </div>
   </div>

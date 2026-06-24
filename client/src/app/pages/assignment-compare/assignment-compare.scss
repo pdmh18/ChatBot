@@ -1,0 +1,262 @@
+﻿.compare-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-heading h2,
+.page-heading p {
+  margin: 0;
+}
+
+.page-heading h2 {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.page-heading p {
+  margin-top: 8px;
+  color: #667085;
+}
+
+.page-heading button {
+  min-width: 114px;
+  height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.info-message {
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.control-panel,
+.summary-strip,
+.compare-card,
+.panel {
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+  background: white;
+}
+
+.control-panel {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) repeat(3, minmax(150px, 1fr));
+  gap: 16px;
+  padding: 18px;
+  align-items: end;
+}
+
+.control-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: #344054;
+  font-weight: 700;
+}
+
+.control-panel input,
+.control-panel select {
+  width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid #cfd6e1;
+  border-radius: 8px;
+  background: white;
+  color: #111827;
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.control-panel input:focus,
+.control-panel select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 14px;
+}
+
+.summary-strip div {
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.summary-strip span,
+.metric-row span {
+  color: #667085;
+}
+
+.summary-strip strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.compare-grid,
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.compare-card {
+  padding: 20px;
+}
+
+.compare-card h3,
+.compare-card p,
+.panel h3 {
+  margin: 0;
+}
+
+.compare-card p {
+  min-height: 48px;
+  margin-top: 8px;
+  color: #667085;
+  line-height: 1.45;
+}
+
+.ai-card {
+  border-color: #93c5fd;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.12);
+}
+
+.metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #edf0f3;
+}
+
+.metric-row:first-of-type {
+  margin-top: 12px;
+}
+
+.metric-row strong {
+  font-size: 20px;
+}
+
+.panel {
+  padding: 20px;
+}
+
+.developer-table {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+}
+
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 1.7fr 0.6fr 0.7fr 0.7fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.table-head {
+  background: #f8fafc;
+  color: #344054;
+  font-weight: 800;
+}
+
+.table-row {
+  border-top: 1px solid #edf0f3;
+}
+
+.table-row small {
+  display: block;
+  margin-top: 4px;
+  color: #667085;
+}
+
+.assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.assignment-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.assignment-item p {
+  margin: 6px 0 0;
+  color: #667085;
+  line-height: 1.4;
+}
+
+.assignment-item span {
+  color: #1d4ed8;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .control-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .control-panel,
+  .summary-strip,
+  .compare-grid,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-heading {
+    flex-direction: column;
+  }
+
+  .page-heading button {
+    width: 100%;
+  }
+
+  .assignment-item,
+  .table-head,
+  .table-row {
+    grid-template-columns: 1fr;
+  }
+}

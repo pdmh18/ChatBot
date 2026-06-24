@@ -1,5 +1,9 @@
-<h2>Gantt Chart</h2>
+﻿<h2>Gantt Chart</h2>
 
 <div class="gantt-wrapper">
+  @if (emptyMessage) {
+    <div class="gantt-empty">{{ emptyMessage }}</div>
+  }
+
   <svg id="gantt"></svg>
 </div>
