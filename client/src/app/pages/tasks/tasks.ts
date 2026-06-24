@@ -50,6 +50,14 @@ export class Tasks implements OnInit {
   lookupMessage = '';
   taskDataMessage = 'Đang tải danh sách task từ backend...';
 
+  get emptyTaskMessage(): string {
+    if (this.tasks.length && !this.filteredTasks.length) {
+      return 'Không có task nào khớp với bộ lọc hiện tại.';
+    }
+
+    return this.taskDataMessage;
+  }
+
   isAddTaskOpen = false;
 
   newTask: Omit<Task, 'id'> = this.createEmptyTask();
@@ -267,7 +275,7 @@ export class Tasks implements OnInit {
     const project = this.projects.find((item) => item.name === this.newTask.project);
     const sprint = this.sprints.find((item) => item.tenSprint === this.newTask.sprint && item.maDuAn === project?.id);
     const assignee = this.users.find((item) => item.hoTen === this.newTask.assignee);
-    const creator = this.users[0];
+    const creatorId = this.getCurrentUserId(assignee?.id);
 
     return {
       maDuAn: project?.id ?? 1,
@@ -275,7 +283,7 @@ export class Tasks implements OnInit {
       maCongViecCode: null,
       tenCongViec: this.newTask.name.trim(),
       moTa: this.newTask.description ?? null,
-      maNguoiTao: creator?.id ?? assignee?.id ?? 1,
+      maNguoiTao: creatorId,
       maNguoiPhuTrach: assignee?.id ?? null,
       doUuTien: this.newTask.priority,
       trangThai: this.newTask.status,
@@ -284,6 +292,16 @@ export class Tasks implements OnInit {
       soGioUocTinh: this.newTask.estimatedHours ?? 8,
       tienDo: this.newTask.progress ?? 0,
     };
+  }
+
+  private getCurrentUserId(fallbackUserId?: number | null): number {
+    const storedUserId = Number(localStorage.getItem('userId') ?? localStorage.getItem('maNguoiDung'));
+
+    if (Number.isInteger(storedUserId) && storedUserId > 0) {
+      return storedUserId;
+    }
+
+    return fallbackUserId ?? 1;
   }
 
   private validateTask(): string {
@@ -353,6 +371,7 @@ export class Tasks implements OnInit {
     return new Date().toISOString().slice(0, 10);
   }
 }
+
 
 
 
