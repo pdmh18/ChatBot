@@ -239,47 +239,6 @@ def train():
 # PREDICT — dùng khi API gọi
 # ============================================================
 
-# def predict_risk(task_features: dict, model=None) -> dict:
-#     """
-#     Dự báo task có trễ hạn không.
-
-#     Input: dict với các key trong FEATURE_COLS
-#     Ví dụ:
-#       {
-#         "SoGioUocTinh": 24,
-#         "SoNamKinhNghiemNhanSu": 3,
-#         "KhoiLuongHienTaiNhanSu": 0.7,
-#         "SoCongViecPhuThuocTruoc": 2,
-#         "DoUuTien_Encoded": 2
-#       }
-
-#     Output: dict với xác suất và mức độ rủi ro
-#     """
-#     # Load scaler từ pipeline
-#     scaler_path = MODEL_DIR / "risk_pipeline_scaler.joblib"
-#     scaler      = joblib.load(scaler_path)
-
-#     # Load model
-#     if model is None:
-#         model = joblib.load(MODEL_DIR / "risk_model.joblib")
-#     metadata  = joblib.load(MODEL_DIR / "risk_model_metadata.joblib")
-#     threshold = metadata.get("optimal_threshold", 0.5)
-
-#     # Chuẩn hóa input giống lúc train
-#     X_raw    = pd.DataFrame([task_features])[FEATURE_COLS]
-#     X_scaled = scaler.transform(X_raw)
-#     X        = pd.DataFrame(X_scaled, columns=FEATURE_COLS)
-
-#     proba = model.predict_proba(X)[0, 1]
-#     label = int(proba >= threshold)
-
-
-#     return {
-#         "xac_suat_tre_han": round(float(proba), 4),
-#         "du_bao_tre_han":   bool(label),
-#         "muc_do_rui_ro":    "Cao" if proba > 0.7 else (
-#                             "Trung bình" if proba > 0.4 else "Thấp"),
-#     }
 
 def predict_risk(task_features: dict, model=None, threshold=None) -> dict:
     """
@@ -307,13 +266,14 @@ def predict_risk(task_features: dict, model=None, threshold=None) -> dict:
     if model is None:
         model = joblib.load(MODEL_DIR / "risk_model.joblib")
     metadata = joblib.load(MODEL_DIR / "risk_model_metadata.joblib")
+    feature_cols = metadata["feature_cols"]  # ← đọc từ metadata
     if threshold is None:
         threshold = metadata["optimal_threshold"]
  
     # Chuẩn hóa input
-    X_raw    = pd.DataFrame([task_features])[FEATURE_COLS]
+    X_raw = pd.DataFrame([task_features])[feature_cols]
     X_scaled = scaler.transform(X_raw)
-    X        = pd.DataFrame(X_scaled, columns=FEATURE_COLS)
+    X        = pd.DataFrame(X_scaled, columns=feature_cols)
  
     proba = model.predict_proba(X)[0, 1]
     label = int(proba >= threshold)
@@ -364,11 +324,17 @@ def predict_risk(task_features: dict, model=None, threshold=None) -> dict:
  
     nguyen_nhan = " & ".join(reasons)
  
+    if proba >= max(threshold, 0.7):
+        muc_do_rui_ro = "Cao"
+    elif proba >= threshold:
+        muc_do_rui_ro = "Trung bình"
+    else:
+        muc_do_rui_ro = "Thấp"
+
     return {
         "xac_suat_tre_han": round(float(proba), 4),
         "du_bao_tre_han":   bool(label),
-        "muc_do_rui_ro":    "Cao" if proba > 0.7 else (
-                            "Trung bình" if proba > 0.4 else "Thấp"),
+        "muc_do_rui_ro":    muc_do_rui_ro,
         "nguyen_nhan":      nguyen_nhan,
     }
 
