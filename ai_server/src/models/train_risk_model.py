@@ -67,6 +67,8 @@ def train():
     print(f"   Train: {len(X_train)} dòng | Test: {len(X_test)} dòng")
     print(f"   Train label: {dict(y_train.value_counts())}")
     print(f"   Test label:  {dict(y_test.value_counts())}")
+
+    #2.	Áp dụng SMOTE cân bằng nhãn trên tập train (tỉ lệ 0/1 chênh > 20%).
     ratio = y_train.value_counts().min() / y_train.value_counts().max()
     if ratio < 0.8:
         print("\n   Áp dụng SMOTE để cân bằng dữ liệu train...")
@@ -119,7 +121,7 @@ def train():
     print(f"     reg_lambda (L2): 1.0")
 
     # --------------------------------------------------------
-    # 3. CROSS-VALIDATION TRƯỚC KHI TRAIN CHÍNH THỨC
+    # 3. Cross-Validation 5-fold đánh giá độ ổn định trước khi train chính thức.
     # --------------------------------------------------------
     print("\n📌 [3/4] Cross-Validation (5-fold)...")
     """
@@ -128,15 +130,15 @@ def train():
     → Phát hiện overfitting sớm
     """
     cv_model = XGBClassifier(
-        n_estimators     = 100,
-        max_depth        = 4,
-        learning_rate    = 0.05,
-        subsample        = 0.8,
-        colsample_bytree = 0.8,
-        reg_alpha        = 0.1,
-        reg_lambda       = 1.0,
-        eval_metric      = "logloss",
-        random_state     = 42,
+        n_estimators     = 100, #•	Số cây: 100 
+        max_depth        = 4, #Độ sâu tối đa: 4 
+        learning_rate    = 0.05, #Tốc độ học: 0.05
+        subsample        = 0.8, #Sử dụng 80% dữ liệu mỗi lần train 1 cây
+        colsample_bytree = 0.8, #Sử dụng 80% feature mỗi lần train 1 cây
+        reg_alpha        = 0.1, #L1 regularization (tránh overfitting)
+        reg_lambda       = 1.0, #L2 regularization (tránh overfitting)
+        eval_metric      = "logloss", #Dùng logloss để đánh giá trong quá trình train
+        random_state     = 42, 
         n_jobs           = -1,
     )
 
@@ -177,7 +179,7 @@ def train():
     roc_auc = roc_auc_score(y_test, y_proba)
     print(f"ROC-AUC: {roc_auc:.3f}")
 
-    # Tìm ngưỡng tối ưu
+    # 5.	Tìm ngưỡng phân loại tối ưu bằng ROC Curve thay vì dùng mặc định 0.5.
 
     fpr, tpr, thresholds = roc_curve(y_test, y_proba)
     optimal_idx = np.argmax(tpr - fpr)
@@ -237,46 +239,103 @@ def train():
 # PREDICT — dùng khi API gọi
 # ============================================================
 
-def predict_risk(task_features: dict, model=None) -> dict:
-    """
-    Dự báo task có trễ hạn không.
 
+def predict_risk(task_features: dict, model=None, threshold=None) -> dict:
+    """
+    Dự báo task có nguy cơ trễ hạn không.
+    Thêm trường nguyen_nhan dựa trên Feature Importance.
+ 
     Input: dict với các key trong FEATURE_COLS
-    Ví dụ:
-      {
-        "SoGioUocTinh": 24,
-        "SoNamKinhNghiemNhanSu": 3,
-        "KhoiLuongHienTaiNhanSu": 0.7,
-        "SoCongViecPhuThuocTruoc": 2,
-        "DoUuTien_Encoded": 2
-      }
-
-    Output: dict với xác suất và mức độ rủi ro
+    Output: dict với xác suất, dự báo, mức độ rủi ro và nguyên nhân
     """
-    # Load scaler từ pipeline
-    scaler_path = MODEL_DIR / "risk_pipeline_scaler.joblib"
-    scaler      = joblib.load(scaler_path)
-
-    # Load model
+    import pandas as pd
+    import joblib
+    from pathlib import Path
+ 
+    MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "models"
+    FEATURE_COLS = [
+        "SoGioUocTinh",
+        "SoNamKinhNghiemNhanSu",
+        "KhoiLuongHienTaiNhanSu",
+        "SoCongViecPhuThuocTruoc",
+        "DoUuTien_Encoded",
+    ]
+ 
+    # Load scaler + model + metadata
+    scaler   = joblib.load(MODEL_DIR / "risk_pipeline_scaler.joblib")
     if model is None:
         model = joblib.load(MODEL_DIR / "risk_model.joblib")
-    metadata  = joblib.load(MODEL_DIR / "risk_model_metadata.joblib")
-    threshold = metadata.get("optimal_threshold", 0.5)
-
-    # Chuẩn hóa input giống lúc train
-    X_raw    = pd.DataFrame([task_features])[FEATURE_COLS]
+    metadata = joblib.load(MODEL_DIR / "risk_model_metadata.joblib")
+    feature_cols = metadata["feature_cols"]  # ← đọc từ metadata
+    if threshold is None:
+        threshold = metadata["optimal_threshold"]
+ 
+    # Chuẩn hóa input
+    X_raw = pd.DataFrame([task_features])[feature_cols]
     X_scaled = scaler.transform(X_raw)
-    X        = pd.DataFrame(X_scaled, columns=FEATURE_COLS)
-
+    X        = pd.DataFrame(X_scaled, columns=feature_cols)
+ 
     proba = model.predict_proba(X)[0, 1]
     label = int(proba >= threshold)
-
+ 
+    # --------------------------------------------------------
+    # THÊM MỚI: Tính nguyên nhân từ Feature Importance + giá trị thực
+    # --------------------------------------------------------
+    reasons = []
+ 
+    so_gio             = task_features.get("SoGioUocTinh", 0)
+    phu_thuoc          = task_features.get("SoCongViecPhuThuocTruoc", 0)
+    khoi_luong         = task_features.get("KhoiLuongHienTaiNhanSu", 0)
+    kinh_nghiem        = task_features.get("SoNamKinhNghiemNhanSu", 0)
+    do_uu_tien         = task_features.get("DoUuTien_Encoded", 0)
+ 
+    # Feature quan trọng nhất: SoCongViecPhuThuocTruoc (77.7%)
+    if phu_thuoc >= 2:
+        reasons.append(f"Phụ thuộc {int(phu_thuoc)} task trước chưa hoàn thành")
+    elif phu_thuoc == 1:
+        reasons.append("Phụ thuộc 1 task trước chưa hoàn thành")
+ 
+    # Feature quan trọng thứ 2: SoGioUocTinh (14.1%)
+    if so_gio > 32:
+        reasons.append(f"Ước tính {int(so_gio)}h — vượt ngưỡng rủi ro (>32h)")
+    elif so_gio > 24:
+        reasons.append(f"Ước tính {int(so_gio)}h — tương đối lớn")
+ 
+    # KhoiLuongHienTaiNhanSu
+    if khoi_luong >= 0.8:
+        reasons.append(f"Nhân sự đang quá tải ({int(khoi_luong*100)}%)")
+    elif khoi_luong >= 0.6:
+        reasons.append(f"Nhân sự đang bận ({int(khoi_luong*100)}%)")
+ 
+    # SoNamKinhNghiemNhanSu
+    if kinh_nghiem <= 1:
+        reasons.append("Nhân sự ít kinh nghiệm (≤1 năm)")
+ 
+    # DoUuTien
+    if do_uu_tien == 3:
+        reasons.append("Task khẩn cấp — áp lực deadline cao")
+ 
+    # Nếu không có lý do cụ thể
+    if not reasons:
+        if label == 1:
+            reasons.append("Kết hợp nhiều yếu tố rủi ro nhỏ")
+        else:
+            reasons.append("Không có yếu tố rủi ro đáng kể")
+ 
+    nguyen_nhan = " & ".join(reasons)
+ 
+    if proba >= max(threshold, 0.7):
+        muc_do_rui_ro = "Cao"
+    elif proba >= threshold:
+        muc_do_rui_ro = "Trung bình"
+    else:
+        muc_do_rui_ro = "Thấp"
 
     return {
         "xac_suat_tre_han": round(float(proba), 4),
         "du_bao_tre_han":   bool(label),
-        "muc_do_rui_ro":    "Cao" if proba > 0.7 else (
-                            "Trung bình" if proba > 0.4 else "Thấp"),
+        "muc_do_rui_ro":    muc_do_rui_ro,
+        "nguyen_nhan":      nguyen_nhan,
     }
 
 

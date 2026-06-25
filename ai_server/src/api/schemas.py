@@ -18,7 +18,7 @@ class TaskRiskResponse(BaseModel):
     xac_suat_tre_han: float
     du_bao_tre_han: bool
     muc_do_rui_ro: str
-
+    nguyen_nhan: str 
 
 # ============================================================
 # Random Forest — Đề xuất giao việc
