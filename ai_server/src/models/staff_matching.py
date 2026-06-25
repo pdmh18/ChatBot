@@ -77,12 +77,12 @@ def train():
     - n_jobs:         dùng tất cả CPU core
     """
     model = RandomForestClassifier(
-        n_estimators     = 200,
-        max_depth        = 6,
-        min_samples_split= 5,
-        min_samples_leaf = 2,
-        max_features     = 'sqrt',
-        class_weight     = 'balanced',
+        n_estimators     = 200, #•	Số cây: 200 
+        max_depth        = 6, #Độ sâu tối đa: 6
+        min_samples_split= 5, #Tối thiểu 5 mẫu để chia nhánh
+        min_samples_leaf = 2, #Tối thiểu 2 mẫu ở lá
+        max_features     = 'sqrt', #Số feature xem xét mỗi lần chia: căn bậc 2
+        class_weight     = 'balanced', #Tự động cân bằng class theo tỉ lệ
         random_state     = 42,
         n_jobs           = -1,
     )
@@ -96,7 +96,7 @@ def train():
     print("     class_weight:      balanced")
 
     # --------------------------------------------------------
-    # 3. CROSS-VALIDATION
+    # 3. 	Cross-Validation 5-fold để đánh giá độ ổn định.
     # --------------------------------------------------------
     print("\n📌 [3/4] Cross-Validation (5-fold)...")
 
@@ -134,7 +134,7 @@ def train():
     else:
         print("❌ Model YẾU — ROC-AUC < 0.70")
 
-    # Tìm ngưỡng tối ưu
+    # Tìm ngưỡng phân loại tối ưu qua ROC Curve.
     fpr, tpr, thresholds = roc_curve(y_test, y_proba)
     optimal_idx       = np.argmax(tpr - fpr)
     optimal_threshold = thresholds[optimal_idx]
