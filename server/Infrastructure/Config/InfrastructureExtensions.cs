@@ -1,5 +1,6 @@
 ﻿using Application.Features.Ai;
 using Application.Features.Auth;
+using Application.Features.Dashboard;
 using Application.Features.Lookups;
 using Application.Features.Tasks;
 using Infrastructure.Persistence;
@@ -8,6 +9,7 @@ using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
 
 namespace Infrastructure.Config;
 
@@ -42,6 +44,10 @@ public static class InfrastructureExtensions
         // AI
         services.AddScoped<IAiPredictionRepository, AiPredictionRepository>();
         services.AddScoped<IAiIntegrationService, AiIntegrationService>();
+
+        // Dashboard
+        services.AddScoped<IDashboardRepository, DashboardRepository>();
+        services.AddScoped<IDashboardService, DashboardService>();
 
         var aiBaseUrl = config["AiServer:BaseUrl"];
 

@@ -35,6 +35,9 @@ namespace Application.Common.DTOs.Ai
 
         [JsonPropertyName("muc_do_rui_ro")]
         public string MucDoRuiRo { get; set; } = string.Empty;
+
+        [JsonPropertyName("nguyen_nhan")]
+        public string? NguyenNhan { get; set; }
     }
 
     public class StaffMatchAiRequest
@@ -59,6 +62,9 @@ namespace Application.Common.DTOs.Ai
 
         [JsonPropertyName("muc_do_phu_hop")]
         public string MucDoPhuHop { get; set; } = string.Empty;
+
+        [JsonPropertyName("nguyen_nhan")]
+        public string? NguyenNhan { get; set; }
     }
 
     public class BottleneckAiResponse
@@ -150,5 +156,7 @@ namespace Application.Common.DTOs.Ai
         public int? SoNgayTreDuBao { get; set; }
         public string? KhuyenNghiAI { get; set; }
         public DateTime? NgayPhatHien { get; set; }
+        public int SoTaskBiAnhHuongPhiaSau { get; set; }
+        public double BottleneckScore { get; set; }
     }
 }

@@ -142,7 +142,34 @@ namespace Infrastructure.Persistence.Repositories
                 throw;
             }
         }
+        private static string BuildRiskImpact(TaskRiskAiResponse aiResult)
+        {
+            if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
+            {
+                return aiResult.NguyenNhan.Trim();
+            }
 
+            return aiResult.DuBaoTreHan
+                ? "Task co nguy co tre han"
+                : "Nguy co tre han thap";
+        }
+
+        private static string BuildRiskRecommendation(TaskRiskAiResponse aiResult)
+        {
+            var normalizedRiskLevel = NormalizeRiskLevel(aiResult.MucDoRuiRo);
+
+            if (aiResult.DuBaoTreHan || normalizedRiskLevel == "Cao")
+            {
+                return "Can xem lai han chot, khoi luong va nguoi phu trach.";
+            }
+
+            if (normalizedRiskLevel == "Trung binh")
+            {
+                return "Nen theo doi sat tien do va kiem tra tai hien tai cua nhan su.";
+            }
+
+            return "Tiep tuc theo doi tien do task.";
+        }
         public async Task<RiskPredictionResultDto> SaveRiskPredictionAsync(
             AiTaskDataDto task,
             int riskTypeId,
@@ -158,12 +185,8 @@ namespace Infrastructure.Persistence.Repositories
                 PhienBanMoHinh = "1.0",
                 XacSuatRuiRo = Round2(aiResult.XacSuatTreHan),
                 MucDoRuiRo = NormalizeRiskLevel(aiResult.MucDoRuiRo),
-                TacDongDuBao = aiResult.DuBaoTreHan
-                    ? "Task co nguy co tre han"
-                    : "Nguy co tre han thap",
-                KhuyenNghi = aiResult.DuBaoTreHan
-                    ? "Can xem lai han chot, khoi luong va nguoi phu trach."
-                    : "Tiep tuc theo doi tien do task.",
+                TacDongDuBao = BuildRiskImpact(aiResult),
+                KhuyenNghi = BuildRiskRecommendation(aiResult),
                 NgayDuBao = DateTime.UtcNow
             };
 
@@ -260,8 +283,8 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         public async Task<IReadOnlyList<BottleneckResultDto>> SaveBottleneckResultsAsync(
-            IReadOnlyList<BottleneckAiResponse> aiResults,
-            CancellationToken cancellationToken = default)
+    IReadOnlyList<BottleneckAiResponse> aiResults,
+    CancellationToken cancellationToken = default)
         {
             if (aiResults.Count == 0)
             {
@@ -283,8 +306,8 @@ namespace Infrastructure.Persistence.Repositories
                 })
                 .ToDictionaryAsync(x => x.MaCongViec, cancellationToken);
 
-            var entities = new List<DiemNghenAI>();
-
+            var itemsToSave = new List<(DiemNghenAI Entity, BottleneckAiResponse AiResult)>();
+            var now = DateTime.UtcNow;
             foreach (var result in aiResults)
             {
                 if (!tasksById.TryGetValue(result.MaCongViec, out var task))
@@ -292,20 +315,22 @@ namespace Infrastructure.Persistence.Repositories
                     continue;
                 }
 
-                entities.Add(new DiemNghenAI
+                var entity = new DiemNghenAI
                 {
                     MaDuAn = task.MaDuAn,
                     MaCongViec = task.MaCongViec,
                     KhuVucPhatHien = "Cong viec phu thuoc",
-                    NguyenNhan = $"Task anh huong {result.SoTaskBiAnhHuongPhiaSau} task phia sau. Bottleneck score = {result.BottleneckScore:0.0000}",
+                    NguyenNhan = BuildBottleneckReason(result),
                     MucDoNghiemTrong = GetBottleneckSeverity(result.BottleneckScore),
                     SoNgayTreDuBao = 0,
                     KhuyenNghiAI = BuildBottleneckRecommendation(result),
-                    NgayPhatHien = DateTime.UtcNow
-                });
+                    NgayPhatHien = now
+                };
+
+                itemsToSave.Add((entity, result));
             }
 
-            if (entities.Count == 0)
+            if (itemsToSave.Count == 0)
             {
                 return Array.Empty<BottleneckResultDto>();
             }
@@ -313,27 +338,39 @@ namespace Infrastructure.Persistence.Repositories
             await using var transaction = await _context.Database
                 .BeginTransactionAsync(cancellationToken);
 
-            _context.DiemNghenAIs.AddRange(entities);
+            _context.DiemNghenAIs.AddRange(itemsToSave.Select(x => x.Entity));
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            return entities
+            return itemsToSave
                 .Select(x => new BottleneckResultDto
                 {
-                    MaDiemNghen = x.MaDiemNghen,
-                    MaDuAn = x.MaDuAn,
-                    MaCongViec = x.MaCongViec,
-                    KhuVucPhatHien = x.KhuVucPhatHien,
-                    NguyenNhan = x.NguyenNhan,
-                    MucDoNghiemTrong = x.MucDoNghiemTrong,
-                    SoNgayTreDuBao = x.SoNgayTreDuBao,
-                    KhuyenNghiAI = x.KhuyenNghiAI,
-                    NgayPhatHien = x.NgayPhatHien
+                    MaDiemNghen = x.Entity.MaDiemNghen,
+                    MaDuAn = x.Entity.MaDuAn,
+                    MaCongViec = x.Entity.MaCongViec,
+
+                    SoTaskBiAnhHuongPhiaSau = x.AiResult.SoTaskBiAnhHuongPhiaSau,
+                    BottleneckScore = x.AiResult.BottleneckScore,
+
+                    KhuVucPhatHien = x.Entity.KhuVucPhatHien,
+                    NguyenNhan = x.Entity.NguyenNhan,
+                    MucDoNghiemTrong = x.Entity.MucDoNghiemTrong,
+                    SoNgayTreDuBao = x.Entity.SoNgayTreDuBao,
+                    KhuyenNghiAI = x.Entity.KhuyenNghiAI,
+                    NgayPhatHien = x.Entity.NgayPhatHien
                 })
                 .ToList();
         }
+        private static string BuildBottleneckReason(BottleneckAiResponse result)
+        {
+            if (result.SoTaskBiAnhHuongPhiaSau > 0)
+            {
+                return $"Task này đang chặn {result.SoTaskBiAnhHuongPhiaSau} task phía sau. Nếu task này trễ, các task phụ thuộc phía sau có nguy cơ bị kéo trễ. Bottleneck score = {result.BottleneckScore:0.0000}.";
+            }
 
+            return $"Task này có bottleneck score = {result.BottleneckScore:0.0000}, mức ảnh hưởng hiện tại thấp.";
+        }
         private static DeXuatGiaoViecAI BuildStaffMatchEntity(
             AiTaskDataDto task,
             AiUserDataDto user,
@@ -418,7 +455,16 @@ namespace Infrastructure.Persistence.Repositories
                 ? "AI de xuat giao viec"
                 : "AI khong de xuat giao viec";
 
-            return $"{decision}. Muc do phu hop: {aiResult.MucDoPhuHop}. Tai hien tai: {user.PhanTramTai:P0}.";
+            var matchLevel = string.IsNullOrWhiteSpace(aiResult.MucDoPhuHop)
+                ? "Khong xac dinh"
+                : aiResult.MucDoPhuHop.Trim();
+
+            if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
+            {
+                return $"{decision}. Muc do phu hop: {matchLevel}. Ly do: {aiResult.NguyenNhan.Trim()}";
+            }
+
+            return $"{decision}. Muc do phu hop: {matchLevel}. Tai hien tai: {user.PhanTramTai:P0}.";
         }
 
         private static string GetBottleneckSeverity(double score)

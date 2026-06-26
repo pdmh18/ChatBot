@@ -13,6 +13,7 @@ namespace Infrastructure.Persistence.Repositories
     public class TaskRepository : ITaskRepository
     {
         private const string StatusDone = "Hoan thanh";
+        private const string StatusCanceled = "Da huy";
 
         private readonly QuanLyDuAnAiContext _context;
 
@@ -256,11 +257,47 @@ namespace Infrastructure.Persistence.Repositories
 
             return true;
         }
+        private async Task AdjustUserWorkloadAsync(
+    int userId,
+    decimal delta,
+    CancellationToken cancellationToken)
+        {
+            var user = await _context.NguoiDungs
+                .FirstOrDefaultAsync(x => x.MaNguoiDung == userId, cancellationToken);
+
+            if (user == null)
+            {
+                return;
+            }
+
+            var currentWorkload = user.KhoiLuongHienTai ?? 0m;
+            var newWorkload = currentWorkload + delta;
+
+            if (newWorkload < 0m)
+            {
+                newWorkload = 0m;
+            }
+
+            user.KhoiLuongHienTai = newWorkload;
+        }
+
+        private static bool IsActiveForWorkload(string? status)
+        {
+            return !string.Equals(
+                       status?.Trim(),
+                       StatusDone,
+                       StringComparison.OrdinalIgnoreCase)
+                   &&
+                   !string.Equals(
+                       status?.Trim(),
+                       StatusCanceled,
+                       StringComparison.OrdinalIgnoreCase);
+        }
 
         public async Task<bool> AssignAsync(
-            int id,
-            AssignTaskRequest request,
-            CancellationToken cancellationToken = default)
+    int id,
+    AssignTaskRequest request,
+    CancellationToken cancellationToken = default)
         {
             var entity = await _context.CongViecs
                 .FirstOrDefaultAsync(x => x.MaCongViec == id, cancellationToken);
@@ -270,10 +307,46 @@ namespace Infrastructure.Persistence.Repositories
                 return false;
             }
 
-            entity.MaNguoiPhuTrach = request.MaNguoiPhuTrach;
+            var oldAssigneeId = entity.MaNguoiPhuTrach;
+            var newAssigneeId = request.MaNguoiPhuTrach;
+
+            if (oldAssigneeId == newAssigneeId)
+            {
+                entity.NgayCapNhat = DateTime.UtcNow;
+                await _context.SaveChangesAsync(cancellationToken);
+                return true;
+            }
+
+            var estimatedHours = entity.SoGioUocTinh ?? 0m;
+            var shouldUpdateWorkload = IsActiveForWorkload(entity.TrangThai) && estimatedHours > 0m;
+
+            await using var transaction = await _context.Database
+                .BeginTransactionAsync(cancellationToken);
+
+            if (shouldUpdateWorkload)
+            {
+                if (oldAssigneeId.HasValue)
+                {
+                    await AdjustUserWorkloadAsync(
+                        oldAssigneeId.Value,
+                        -estimatedHours,
+                        cancellationToken);
+                }
+
+                if (newAssigneeId.HasValue)
+                {
+                    await AdjustUserWorkloadAsync(
+                        newAssigneeId.Value,
+                        estimatedHours,
+                        cancellationToken);
+                }
+            }
+
+            entity.MaNguoiPhuTrach = newAssigneeId;
             entity.NgayCapNhat = DateTime.UtcNow;
 
             await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             return true;
         }

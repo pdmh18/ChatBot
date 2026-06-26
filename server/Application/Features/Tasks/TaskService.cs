@@ -264,6 +264,9 @@ namespace Application.Features.Tasks
 
         private static void NormalizeCreateRequest(CreateTaskRequest request)
         {
+            request.MaCongViecCode = string.IsNullOrWhiteSpace(request.MaCongViecCode)
+    ? $"TASK-{DateTime.UtcNow:yyyyMMddHHmmssfff}"
+    : request.MaCongViecCode.Trim();
             request.TenCongViec = request.TenCongViec?.Trim() ?? string.Empty;
             request.MaCongViecCode = request.MaCongViecCode?.Trim();
 
