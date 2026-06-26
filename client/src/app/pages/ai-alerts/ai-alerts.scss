@@ -1,9 +1,44 @@
-﻿.alert-section {
-  margin-top: 24px;
+﻿.alerts-heading {
+  margin-bottom: 18px;
 }
 
-.alert-section h3 {
+.alerts-heading h2,
+.alerts-heading p {
+  margin: 0;
+}
+
+.alerts-heading p {
+  margin-top: 8px;
+  color: #667085;
+}
+
+.alert-section {
+  margin-top: 24px;
+  scroll-margin-top: 24px;
+}
+
+.alert-section.focused {
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
   margin-bottom: 12px;
+}
+
+.section-heading h3,
+.section-heading p {
+  margin: 0;
+}
+
+.section-heading p {
+  margin-top: 6px;
+  color: #667085;
 }
 
 .alert-card {
@@ -30,10 +65,27 @@
   outline-offset: 2px;
 }
 
-.alert-card strong {
-  display: block;
+.alert-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
+}
+
+.alert-topline strong {
   font-size: 17px;
+}
+
+.alert-topline span {
+  flex: none;
+  min-width: 58px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  text-align: center;
+  font-weight: 900;
 }
 
 .alert-card p {
@@ -41,19 +93,55 @@
 }
 
 .alert-card small {
+  display: block;
   color: #667085;
+  line-height: 1.45;
 }
 
 .alert-card.danger {
   border-left: 5px solid #dc2626;
 }
 
+.alert-card.danger .alert-topline span {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
 .alert-card.warning {
   border-left: 5px solid #f59e0b;
 }
 
+.alert-card.warning .alert-topline span {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .alert-card.success {
   border-left: 5px solid #16a34a;
+}
+
+.alert-card.success .alert-topline span {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.bottleneck-card .blocked-pill {
+  min-width: auto;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.pm-action {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #344054;
+  line-height: 1.45;
+}
+
+.pm-action b {
+  color: #111827;
 }
 
 .empty-card {
@@ -106,11 +194,15 @@
 }
 
 .modal-header button {
+  width: 40px;
+  height: 40px;
   border: none;
-  background: transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
   color: white;
   cursor: pointer;
   font-size: 18px;
+  font-weight: 900;
   transition: opacity 0.2s;
 }
 
@@ -146,4 +238,103 @@
 .modal-body button:focus {
   outline: 2px solid #93c5fd;
   outline-offset: 2px;
+}
+
+.filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.filter-banner button {
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.suggestion-card p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.model-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.suggestion-reason {
+  color: #344054;
+}
+
+.score-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.score-breakdown span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #dbe5f3;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: 14px;
+}
+
+.show-all-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #2563eb;
+  border-radius: 7px;
+  background: white;
+  color: #2563eb;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.show-all-btn:hover {
+  background: #eff6ff;
+}
+
+@media (max-width: 720px) {
+  .section-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

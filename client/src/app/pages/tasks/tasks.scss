@@ -252,30 +252,85 @@
 
 .developer-card {
   display: grid;
-  grid-template-columns: 1fr 130px 88px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 250px 96px;
+  gap: 16px;
   align-items: center;
-  padding: 14px;
+  padding: 14px 16px;
   border: 1px solid #e1e5ea;
   border-radius: 8px;
+  background: #fff;
 }
 
-.developer-card p {
-  margin: 6px 0 0;
+.developer-main {
+  min-width: 0;
+}
+
+.developer-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.developer-title strong {
+  font-size: 16px;
+}
+
+.model-badge {
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
+.developer-reason {
+  margin: 8px 0 0;
   color: #667085;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.developer-score span {
-  display: block;
+.developer-reason span {
+  color: #344054;
+  font-weight: 700;
+}
+
+.developer-score {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.score-main span {
   color: #16a34a;
+  display: block;
+  font-size: 22px;
   font-weight: 800;
 }
 
-.developer-score small {
+.score-main small {
   color: #667085;
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
 }
 
+.score-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.score-metrics small {
+  background: #f2f4f7;
+  border-radius: 999px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+}
 .developer-card button {
   height: 38px;
   border: none;
@@ -431,5 +486,47 @@
   .toolbar select,
   .add-btn {
     width: 100%;
+  }
+}
+
+
+
+
+.task-list-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -2px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #dbe5f3;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #475569;
+}
+
+.task-list-summary strong {
+  color: #111827;
+}
+
+.show-all-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #2563eb;
+  border-radius: 7px;
+  background: white;
+  color: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.show-all-btn:hover {
+  background: #eff6ff;
+}
+
+@media (max-width: 720px) {
+  .task-list-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

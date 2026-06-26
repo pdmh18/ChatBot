@@ -13,6 +13,13 @@ import {
   UpdateTaskStatusRequest,
 } from '../models/task';
 
+interface ApiListResponse<T> {
+  value?: T[];
+  Value?: T[];
+  count?: number;
+  Count?: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -22,9 +29,11 @@ export class TaskService {
   constructor(private http: HttpClient) {}
 
   getTasks(params?: TaskQueryParams): Observable<TaskListItem[]> {
-    return this.http.get<TaskListItem[]>(this.apiUrl, {
-      params: this.buildParams(params),
-    });
+    return this.http
+      .get<TaskListItem[] | ApiListResponse<TaskListItem>>(this.apiUrl, {
+        params: this.buildParams(params),
+      })
+      .pipe(map((response) => this.unwrapList(response)));
   }
 
   getTaskViews(params?: TaskQueryParams): Observable<Task[]> {
@@ -82,6 +91,11 @@ export class TaskService {
       progress: item.tienDo ?? 0,
       riskScore: item.riskPercent ?? 0,
       riskLevel: item.riskLevel,
+      blockedTasks: item.blockedTasks ?? item.soTaskBiChan ?? item.soTaskDangChan ?? item.soTaskPhuThuoc ?? null,
+      overloadPercent: item.overloadPercent ?? null,
+      dependencyBlockedCount: item.dependencyBlockedCount ?? item.soTaskPhuThuoc ?? null,
+      aiReason: item.aiReason ?? item.nguyenNhanAI ?? null,
+      featureImportance: this.normalizeFeatureImportance(item.featureImportance),
     };
   }
 
@@ -94,6 +108,21 @@ export class TaskService {
       completedDate: detail.ngayHoanThanh ?? null,
       actualHours: detail.soGioThucTe ?? null,
     };
+  }
+
+  private unwrapList<T>(response: T[] | ApiListResponse<T>): T[] {
+    if (Array.isArray(response)) return response;
+    return response.value ?? response.Value ?? [];
+  }
+
+  private normalizeFeatureImportance(value?: string[] | string | null): string[] | null {
+    if (Array.isArray(value)) return value;
+    if (!value) return null;
+
+    return value
+      .split(/[;,]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
   private buildParams(params?: TaskQueryParams): HttpParams {

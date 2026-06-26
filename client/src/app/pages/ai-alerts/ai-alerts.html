@@ -1,48 +1,165 @@
-﻿<h2>AI Alerts</h2>
+﻿<div class="alerts-heading">
+  <div>
+    <h2>AI Alerts</h2>
+    <p>Radar cảnh báo hằng ngày cho PM: phát hiện task sắp trễ, điểm nghẽn và gợi ý hành động xử lý.</p>
+  </div>
+</div>
 
-<section class="alert-section">
-  <h3>Dự báo task trễ hạn</h3>
+<div class="filter-banner">
+  <strong>{{ pageModeTitle }}</strong>
+  @if (filter) {
+    <button type="button" (click)="clearFilter()">Xem tất cả cảnh báo</button>
+  }
+</div>
 
-  @for (item of lateRisks; track item.id) {
-    <div class="alert-card danger">
-      <strong>{{ item.task }}</strong>
-      <p>Nguy cơ trễ hạn: {{ getRiskPercent(item) }}%</p>
-      <small>{{ item.reason }}</small>
+@if (showLateRiskSection) {
+  <section #lateRiskSection class="alert-section" [class.focused]="focus === 'late-risk'">
+    <div class="section-heading">
+      <div>
+        <h3>Dự báo task trễ hạn</h3>
+        <p>AI chỉ ra task rủi ro cao, nguyên nhân và quyết định PM nên làm tiếp.</p>
+      </div>
     </div>
-  }
 
-  @if (!lateRisks.length) {
-    <div class="empty-card">Chưa có dữ liệu dự báo rủi ro. Hãy chạy AI dự báo từ màn hình Tasks.</div>
-  }
-</section>
+    @if (lateRisks.length) {
+      <div class="section-actions">
+        <span>Đang hiển thị top {{ visibleLateRisks.length }} / {{ lateRisks.length }} cảnh báo trễ hạn</span>
+        @if (hasHiddenLateRisks) {
+          <button type="button" class="show-all-btn" (click)="toggleLateRisks()">
+            {{ showAllLateRisks ? 'Thu gọn top 5' : 'Hiện tất cả' }}
+          </button>
+        }
+      </div>
+    }
 
-<section class="alert-section">
-  <h3>Phát hiện điểm nghẽn</h3>
+    @for (item of visibleLateRisks; track item.id) {
+      <article class="alert-card" [class.danger]="item.severity === 'danger'" [class.warning]="item.severity === 'warning'">
+        <div class="alert-topline">
+          <strong>{{ item.task }}</strong>
+          <span>{{ getRiskPercent(item) }}%</span>
+        </div>
 
-  @if (aiMessage) {
-    <div class="empty-card">{{ aiMessage }}</div>
-  }
+        <p>{{ item.reason }}</p>
+        <small>{{ item.explanation }}</small>
 
-  @for (item of bottleneckResults; track item.maDiemNghen) {
-    <button type="button" class="alert-card warning" (click)="openBottleneckAlert(item)">
-      <strong>Task #{{ item.maCongViec || 'N/A' }}</strong>
-      <p>Mức độ: {{ item.mucDoNghiemTrong }}</p>
-      <small>{{ item.nguyenNhan || item.khuVucPhatHien }}</small>
-    </button>
-  }
-</section>
+        <div class="pm-action">
+          <b>PM nên quyết định:</b>
+          {{ item.pmAction }}
+        </div>
+      </article>
+    }
 
-<section class="alert-section">
-  <h3>Gợi ý giao việc</h3>
+    @if (!lateRisks.length) {
+      <div class="empty-card">Chưa có dữ liệu dự báo rủi ro. Hãy chạy AI dự báo từ màn hình Tasks.</div>
+    }
+  </section>
+}
 
-  @for (item of suggestions; track item.id) {
-    <div class="alert-card success">
-      <strong>{{ item.task }}</strong>
-      <p>Nên giao cho: {{ item.developer }}</p>
-      <small>Độ phù hợp: {{ item.score }}%</small>
+@if (showBottleneckSection) {
+  <section #bottleneckSection class="alert-section" [class.focused]="focus === 'bottleneck'">
+    <div class="section-heading">
+      <div>
+        <h3>Phát hiện điểm nghẽn GNN</h3>
+        <p>Điểm nghẽn là task nếu bị trễ sẽ kéo theo nhiều task phụ thuộc phía sau.</p>
+      </div>
     </div>
-  }
-</section>
+
+    @if (aiMessage) {
+      <div class="empty-card">{{ aiMessage }}</div>
+    }
+
+    @if (bottleneckResults.length) {
+      <div class="section-actions">
+        <span>Đang hiển thị top {{ visibleBottlenecks.length }} / {{ bottleneckResults.length }} điểm nghẽn</span>
+        @if (hasHiddenBottlenecks) {
+          <button type="button" class="show-all-btn" (click)="toggleBottlenecks()">
+            {{ showAllBottlenecks ? 'Thu gọn top 5' : 'Hiện tất cả' }}
+          </button>
+        }
+      </div>
+    }
+
+    @for (item of visibleBottlenecks; track item.maDiemNghen) {
+      <button type="button" class="alert-card warning bottleneck-card" (click)="openBottleneckAlert(item)">
+        <div class="alert-topline">
+          <strong>Task #{{ item.maCongViec || 'N/A' }}</strong>
+          <span class="blocked-pill">Chặn {{ getBottleneckImpact(item) }} task</span>
+        </div>
+
+        <p>Mức độ: {{ item.mucDoNghiemTrong }}</p>
+        <small>Nguyên nhân AI: {{ item.nguyenNhan || item.khuVucPhatHien }}</small>
+
+        <div class="pm-action">
+          <b>PM nên quyết định:</b>
+          {{ item.khuyenNghiAI || 'Ưu tiên xử lý task này trước để tránh kéo trễ chuỗi phụ thuộc.' }}
+        </div>
+      </button>
+    }
+  </section>
+}
+
+@if (showSuggestionsSection) {
+  <section class="alert-section">
+    <div class="section-heading">
+      <div>
+        <h3>Gợi ý giao việc</h3>
+        <p>AI hỗ trợ PM chọn nhân sự phù hợp dựa trên tải hiện tại, kỹ năng, kinh nghiệm và rủi ro của task.</p>
+      </div>
+    </div>
+
+    @if (isSuggestionsLoading || suggestionsMessage) {
+      <div class="empty-card">{{ suggestionsMessage }}</div>
+    }
+
+    @if (suggestions.length) {
+      <div class="section-actions">
+        <span>Đang hiển thị top {{ visibleSuggestions.length }} / {{ suggestions.length }} gợi ý giao việc</span>
+        @if (hasHiddenSuggestions) {
+          <button type="button" class="show-all-btn" (click)="toggleSuggestions()">
+            {{ showAllSuggestions ? 'Thu gọn top 5' : 'Hiện tất cả' }}
+          </button>
+        }
+      </div>
+    }
+
+    @for (item of visibleSuggestions; track item.id) {
+      <div class="alert-card success suggestion-card">
+        <div class="alert-topline">
+          <strong>{{ item.task }}</strong>
+          <span>{{ item.score }}%</span>
+        </div>
+
+        <p>
+          <b>Nên giao cho:</b>
+          {{ item.developer }}
+          @if (item.model) {
+            <span class="model-badge">{{ item.model }}</span>
+          }
+        </p>
+
+        @if (item.reason) {
+          <small class="suggestion-reason">Lý do AI: {{ item.reason }}</small>
+        } @else {
+          <small class="suggestion-reason">Lý do AI: API chưa trả lý do chi tiết, chỉ có điểm phù hợp tổng hợp.</small>
+        }
+
+        @if (item.skillScore != null || item.workloadScore != null || item.expScore != null) {
+          <div class="score-breakdown">
+            @if (item.skillScore != null) {
+              <span>Kỹ năng: {{ item.skillScore }}%</span>
+            }
+            @if (item.workloadScore != null) {
+              <span>Mức độ còn rảnh: {{ item.workloadScore }}%</span>
+            }
+            @if (item.expScore != null) {
+              <span>Kinh nghiệm: {{ item.expScore }}</span>
+            }
+          </div>
+        }
+      </div>
+    }
+  </section>
+}
 
 @if (selectedBottleneck) {
   <div class="modal-backdrop">
@@ -53,7 +170,7 @@
           <p>Task #{{ selectedBottleneck.maCongViec || 'N/A' }}</p>
         </div>
 
-        <button type="button" (click)="closeBottleneckAlert()">X</button>
+        <button type="button" aria-label="Đóng popup" (click)="closeBottleneckAlert()">X</button>
       </header>
 
       <div class="modal-body">
@@ -63,11 +180,17 @@
         </p>
 
         <p>
-          Nguyên nhân: {{ selectedBottleneck.nguyenNhan || selectedBottleneck.khuVucPhatHien }}
+          Nguyên nhân AI: {{ selectedBottleneck.nguyenNhan || selectedBottleneck.khuVucPhatHien }}
         </p>
 
         <p>
-          Khuyến nghị AI: {{ selectedBottleneck.khuyenNghiAI || 'PM nên ưu tiên kiểm tra task này để tránh ảnh hưởng tiến độ.' }}
+          Tác động dây chuyền: đang ảnh hưởng khoảng
+          <strong>{{ getBottleneckImpact(selectedBottleneck) }} task</strong>
+          phía sau.
+        </p>
+
+        <p>
+          PM nên quyết định: {{ selectedBottleneck.khuyenNghiAI || 'Ưu tiên xử lý task này, kiểm tra task phụ thuộc và điều chỉnh nhân sự nếu cần.' }}
         </p>
 
         <p>
@@ -81,3 +204,6 @@
     </div>
   </div>
 }
+
+
+
