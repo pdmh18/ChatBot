@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using static Application.Common.DTOs.Dashboard.DashboardDtos;
 
@@ -36,16 +36,18 @@ namespace Application.Features.Dashboard
             ApplyRisk(tasks);
 
             var bottleneckCount = await _repository.CountLatestBottleneckBatchAsync(
-    projectId,
-    sprintId,
-    cancellationToken);
+                projectId,
+                sprintId,
+                cancellationToken);
 
             return new DashboardSummaryDto
             {
-                TongCongViec = tasks.Count,
+                TongCongViec = tasks.Count(x => !IsSame(x.TrangThai, StatusCanceled)),
                 TaskNguyCoTreHan = tasks.Count(x => x.RiskPercent >= 70),
                 DiemNghen = bottleneckCount,
-                TaskChuaPhanCong = tasks.Count(x => !x.MaNguoiPhuTrach.HasValue),
+                TaskChuaPhanCong = tasks.Count(x =>
+                    !x.MaNguoiPhuTrach.HasValue &&
+                    !IsSame(x.TrangThai, StatusCanceled)),
                 TaskHoanThanh = tasks.Count(x => IsSame(x.TrangThai, StatusDone)),
                 TaskDangLam = tasks.Count(x =>
                     !IsSame(x.TrangThai, StatusDone) &&
@@ -58,42 +60,18 @@ namespace Application.Features.Dashboard
             int? sprintId,
             CancellationToken cancellationToken = default)
         {
-            var tasks = await _repository.GetTasksAsync(
+            var workload = await _repository.GetWorkloadAsync(
                 projectId,
                 sprintId,
                 cancellationToken);
 
-            var activeTasks = tasks
-                .Where(x =>
-                    x.MaNguoiPhuTrach.HasValue &&
-                    !IsSame(x.TrangThai, StatusDone) &&
-                    !IsSame(x.TrangThai, StatusCanceled))
-                .ToList();
+            foreach (var item in workload)
+            {
+                item.PhanTramTai = Math.Round(item.PhanTramTai, 2);
+                item.MucDoTai = GetWorkloadLevel(item.PhanTramTai);
+            }
 
-            return activeTasks
-                .GroupBy(x => new
-                {
-                    MaNguoiDung = x.MaNguoiPhuTrach!.Value,
-                    HoTen = x.NguoiPhuTrach ?? "Khong ro"
-                })
-                .Select(g =>
-                {
-                    var tongGio = g.Sum(x => x.SoGioUocTinh ?? 0m);
-
-                   
-                    // 60h được xem là 100% tải trong sprint.
-                    var phanTramTai = Math.Round((tongGio / 60m) * 100m, 2);
-
-                    return new DashboardWorkloadDto
-                    {
-                        MaNguoiDung = g.Key.MaNguoiDung,
-                        HoTen = g.Key.HoTen,
-                        SoTask = g.Count(),
-                        TongGioUocTinh = tongGio,
-                        PhanTramTai = phanTramTai,
-                        MucDoTai = GetWorkloadLevel(phanTramTai)
-                    };
-                })
+            return workload
                 .OrderByDescending(x => x.TongGioUocTinh)
                 .ToList();
         }
@@ -113,7 +91,6 @@ namespace Application.Features.Dashboard
 
             ApplyRisk(tasks);
 
-            
             // Bottleneck lấy từ AI bằng POST /api/ai/bottlenecks/analyze?topN=10.
             if (normalizedType == "bottleneck")
             {
@@ -121,7 +98,9 @@ namespace Application.Features.Dashboard
             }
 
             return tasks
-                .Where(x => x.RiskPercent >= 70)
+                .Where(x =>
+                    x.RiskPercent >= 70 &&
+                    !IsSame(x.TrangThai, StatusCanceled))
                 .Select(x =>
                 {
                     x.LoaiCanhBao = "Tre han";
@@ -146,6 +125,7 @@ namespace Application.Features.Dashboard
                 task.RiskLevel = GetRiskLevel(task.RiskPercent);
             }
         }
+
         private static bool IsInactiveStatus(string? status)
         {
             return IsSame(status, StatusDone)

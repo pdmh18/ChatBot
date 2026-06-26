@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
 namespace Application.Common.DTOs.Ai
 {
@@ -79,14 +75,11 @@ namespace Application.Common.DTOs.Ai
         public double BottleneckScore { get; set; }
     }
 
-    // ============================================================
-    // Internal data DTOs lấy từ DB để build request cho AI
-    // ============================================================
-
     public class AiTaskDataDto
     {
         public int MaCongViec { get; set; }
         public int MaDuAn { get; set; }
+        public int? MaSprint { get; set; }
         public string TenCongViec { get; set; } = string.Empty;
         public decimal SoGioUocTinh { get; set; }
         public string DoUuTien { get; set; } = "Trung binh";
@@ -98,9 +91,17 @@ namespace Application.Common.DTOs.Ai
         public int MaNguoiDung { get; set; }
         public string HoTen { get; set; } = string.Empty;
         public int SoNamKinhNghiem { get; set; }
+
+        // Tổng giờ task active của user trong cùng project + sprint với task đang xét.
+        // Giá trị này lấy từ view dbo.v_Workload_NhanSu_Sprint, không lấy từ NguoiDung.KhoiLuongHienTai.
         public decimal KhoiLuongHienTai { get; set; }
+
+        // Sức chứa tối đa trong 1 sprint, lấy từ NguoiDung.KhoiLuongToiDa.
         public decimal KhoiLuongToiDa { get; set; }
+
+        // KhoiLuongHienTai / KhoiLuongToiDa, clamp từ 0 đến 1.
         public decimal PhanTramTai { get; set; }
+
         public decimal DiemChatLuongTrungBinh { get; set; }
     }
 
@@ -109,10 +110,6 @@ namespace Application.Common.DTOs.Ai
         public AiUserDataDto User { get; set; } = null!;
         public StaffMatchAiResponse AiResult { get; set; } = new();
     }
-
-    // ============================================================
-    // DTOs trả về frontend sau khi đã lưu DB
-    // ============================================================
 
     public class RiskPredictionResultDto
     {

@@ -60,12 +60,11 @@ namespace Infrastructure.Persistence.Repositories
                     HoTen = x.HoTen,
                     SoNamKinhNghiem = x.SoNamKinhNghiem ?? 0,
 
-                    // Không lấy NguoiDung.KhoiLuongHienTai nữa vì cột đó là global, sai context sprint.
+                    // Không dùng NguoiDung.KhoiLuongHienTai.
+                    // Workload sẽ được lấy từ view workload theo sprint.
                     KhoiLuongHienTai = 0m,
 
-                    // Vẫn dùng KhoiLuongToiDa làm sức chứa tối đa trong 1 sprint.
                     KhoiLuongToiDa = x.KhoiLuongToiDa ?? 40m,
-
                     DiemChatLuongTrungBinh = 5m
                 })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -75,35 +74,30 @@ namespace Infrastructure.Persistence.Repositories
                 return null;
             }
 
-            var workloadQuery = _context.CongViecs
-                .AsNoTracking()
-                .Where(x =>
-                    x.MaNguoiPhuTrach == userId &&
-                    x.MaDuAn == projectId &&
-                    (
-                        x.TrangThai == null ||
-                        (
-                            x.TrangThai != StatusDone &&
-                            x.TrangThai != StatusCanceled
-                        )
-                    ));
+            var workload = await GetWorkloadFromViewAsync(
+                userId,
+                projectId,
+                sprintId,
+                cancellationToken);
 
-            if (sprintId.HasValue)
-            {
-                workloadQuery = workloadQuery.Where(x => x.MaSprint == sprintId.Value);
-            }
-            else
-            {
-                workloadQuery = workloadQuery.Where(x => x.MaSprint == null);
-            }
+            var currentWorkload = workload.TongGioUocTinh;
 
             if (excludedTaskId.HasValue)
             {
-                workloadQuery = workloadQuery.Where(x => x.MaCongViec != excludedTaskId.Value);
-            }
+                var excludedHours = await GetExcludedTaskHoursAsync(
+                    excludedTaskId.Value,
+                    userId,
+                    projectId,
+                    sprintId,
+                    cancellationToken);
 
-            var currentWorkload = await workloadQuery
-                .SumAsync(x => x.SoGioUocTinh ?? 0m, cancellationToken);
+                currentWorkload -= excludedHours;
+
+                if (currentWorkload < 0m)
+                {
+                    currentWorkload = 0m;
+                }
+            }
 
             var qualityScore = await _context.NangLucThanhViens
                 .AsNoTracking()
@@ -383,6 +377,67 @@ namespace Infrastructure.Persistence.Repositories
                 .ToList();
         }
 
+        private async Task<AiWorkloadRow> GetWorkloadFromViewAsync(
+            int userId,
+            int projectId,
+            int? sprintId,
+            CancellationToken cancellationToken)
+        {
+            var result = await _context.Database
+                .SqlQuery<AiWorkloadRow>($"""
+                    SELECT
+                        CAST(ISNULL(w.SoTask, 0) AS BIGINT) AS SoTask,
+                        CAST(ISNULL(w.TongGioUocTinh, 0) AS DECIMAL(18, 2)) AS TongGioUocTinh
+                    FROM (SELECT 1 AS Dummy) d
+                    LEFT JOIN dbo.v_Workload_NhanSu_Sprint w
+                        ON w.MaDuAn = {projectId}
+                       AND w.MaNguoiDung = {userId}
+                       AND (
+                            ({sprintId} IS NULL AND w.MaSprint IS NULL)
+                            OR
+                            ({sprintId} IS NOT NULL AND w.MaSprint = {sprintId})
+                       )
+                    """)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return result ?? new AiWorkloadRow();
+        }
+
+        private async Task<decimal> GetExcludedTaskHoursAsync(
+            int taskId,
+            int userId,
+            int projectId,
+            int? sprintId,
+            CancellationToken cancellationToken)
+        {
+            var query = _context.CongViecs
+                .AsNoTracking()
+                .Where(x =>
+                    x.MaCongViec == taskId &&
+                    x.MaNguoiPhuTrach == userId &&
+                    x.MaDuAn == projectId &&
+                    (
+                        x.TrangThai == null ||
+                        (
+                            x.TrangThai != StatusDone &&
+                            x.TrangThai != StatusCanceled
+                        )
+                    ));
+
+            if (sprintId.HasValue)
+            {
+                query = query.Where(x => x.MaSprint == sprintId.Value);
+            }
+            else
+            {
+                query = query.Where(x => x.MaSprint == null);
+            }
+
+            return await query
+                .Select(x => x.SoGioUocTinh ?? 0m)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         private static DeXuatGiaoViecAI BuildStaffMatchEntity(
             AiTaskDataDto task,
             AiUserDataDto user,
@@ -580,6 +635,12 @@ namespace Infrastructure.Persistence.Repositories
             }
 
             return normalized;
+        }
+
+        private sealed class AiWorkloadRow
+        {
+            public long SoTask { get; set; }
+            public decimal TongGioUocTinh { get; set; }
         }
     }
 }
