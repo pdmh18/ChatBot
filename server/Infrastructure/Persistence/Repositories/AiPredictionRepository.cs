@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Infrastructure.Persistence.Repositories
@@ -13,6 +13,9 @@ namespace Infrastructure.Persistence.Repositories
     public class AiPredictionRepository : IAiPredictionRepository
     {
         private const string StaffMatchingModelName = "Random Forest Staff Matching";
+
+        private const string StatusDone = "Hoan thanh";
+        private const string StatusCanceled = "Da huy";
 
         private readonly QuanLyDuAnAiContext _context;
 
@@ -32,6 +35,7 @@ namespace Infrastructure.Persistence.Repositories
                 {
                     MaCongViec = x.MaCongViec,
                     MaDuAn = x.MaDuAn,
+                    MaSprint = x.MaSprint,
                     TenCongViec = x.TenCongViec,
                     SoGioUocTinh = x.SoGioUocTinh ?? 0m,
                     DoUuTien = x.DoUuTien ?? "Trung binh",
@@ -42,6 +46,9 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<AiUserDataDto?> GetUserDataAsync(
             int userId,
+            int projectId,
+            int? sprintId,
+            int? excludedTaskId,
             CancellationToken cancellationToken = default)
         {
             var user = await _context.NguoiDungs
@@ -52,8 +59,13 @@ namespace Infrastructure.Persistence.Repositories
                     MaNguoiDung = x.MaNguoiDung,
                     HoTen = x.HoTen,
                     SoNamKinhNghiem = x.SoNamKinhNghiem ?? 0,
-                    KhoiLuongHienTai = x.KhoiLuongHienTai ?? 0m,
+
+                    // Không lấy NguoiDung.KhoiLuongHienTai nữa vì cột đó là global, sai context sprint.
+                    KhoiLuongHienTai = 0m,
+
+                    // Vẫn dùng KhoiLuongToiDa làm sức chứa tối đa trong 1 sprint.
                     KhoiLuongToiDa = x.KhoiLuongToiDa ?? 40m,
+
                     DiemChatLuongTrungBinh = 5m
                 })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -63,14 +75,47 @@ namespace Infrastructure.Persistence.Repositories
                 return null;
             }
 
+            var workloadQuery = _context.CongViecs
+                .AsNoTracking()
+                .Where(x =>
+                    x.MaNguoiPhuTrach == userId &&
+                    x.MaDuAn == projectId &&
+                    (
+                        x.TrangThai == null ||
+                        (
+                            x.TrangThai != StatusDone &&
+                            x.TrangThai != StatusCanceled
+                        )
+                    ));
+
+            if (sprintId.HasValue)
+            {
+                workloadQuery = workloadQuery.Where(x => x.MaSprint == sprintId.Value);
+            }
+            else
+            {
+                workloadQuery = workloadQuery.Where(x => x.MaSprint == null);
+            }
+
+            if (excludedTaskId.HasValue)
+            {
+                workloadQuery = workloadQuery.Where(x => x.MaCongViec != excludedTaskId.Value);
+            }
+
+            var currentWorkload = await workloadQuery
+                .SumAsync(x => x.SoGioUocTinh ?? 0m, cancellationToken);
+
             var qualityScore = await _context.NangLucThanhViens
                 .AsNoTracking()
                 .Where(x => x.MaNguoiDung == userId)
                 .Select(x => x.DiemChatLuongTrungBinh)
                 .FirstOrDefaultAsync(cancellationToken);
 
+            user.KhoiLuongHienTai = currentWorkload;
             user.DiemChatLuongTrungBinh = qualityScore ?? 5m;
-            user.PhanTramTai = CalculateWorkloadRatio(user.KhoiLuongHienTai, user.KhoiLuongToiDa);
+            user.PhanTramTai = CalculateWorkloadRatio(
+                user.KhoiLuongHienTai,
+                user.KhoiLuongToiDa);
 
             return user;
         }
@@ -142,34 +187,7 @@ namespace Infrastructure.Persistence.Repositories
                 throw;
             }
         }
-        private static string BuildRiskImpact(TaskRiskAiResponse aiResult)
-        {
-            if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
-            {
-                return aiResult.NguyenNhan.Trim();
-            }
 
-            return aiResult.DuBaoTreHan
-                ? "Task co nguy co tre han"
-                : "Nguy co tre han thap";
-        }
-
-        private static string BuildRiskRecommendation(TaskRiskAiResponse aiResult)
-        {
-            var normalizedRiskLevel = NormalizeRiskLevel(aiResult.MucDoRuiRo);
-
-            if (aiResult.DuBaoTreHan || normalizedRiskLevel == "Cao")
-            {
-                return "Can xem lai han chot, khoi luong va nguoi phu trach.";
-            }
-
-            if (normalizedRiskLevel == "Trung binh")
-            {
-                return "Nen theo doi sat tien do va kiem tra tai hien tai cua nhan su.";
-            }
-
-            return "Tiep tuc theo doi tien do task.";
-        }
         public async Task<RiskPredictionResultDto> SaveRiskPredictionAsync(
             AiTaskDataDto task,
             int riskTypeId,
@@ -191,6 +209,7 @@ namespace Infrastructure.Persistence.Repositories
             };
 
             _context.DuBaoRuiRoAIs.Add(entity);
+
             await _context.SaveChangesAsync(cancellationToken);
 
             return new RiskPredictionResultDto
@@ -283,8 +302,8 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         public async Task<IReadOnlyList<BottleneckResultDto>> SaveBottleneckResultsAsync(
-    IReadOnlyList<BottleneckAiResponse> aiResults,
-    CancellationToken cancellationToken = default)
+            IReadOnlyList<BottleneckAiResponse> aiResults,
+            CancellationToken cancellationToken = default)
         {
             if (aiResults.Count == 0)
             {
@@ -308,6 +327,7 @@ namespace Infrastructure.Persistence.Repositories
 
             var itemsToSave = new List<(DiemNghenAI Entity, BottleneckAiResponse AiResult)>();
             var now = DateTime.UtcNow;
+
             foreach (var result in aiResults)
             {
                 if (!tasksById.TryGetValue(result.MaCongViec, out var task))
@@ -362,15 +382,7 @@ namespace Infrastructure.Persistence.Repositories
                 })
                 .ToList();
         }
-        private static string BuildBottleneckReason(BottleneckAiResponse result)
-        {
-            if (result.SoTaskBiAnhHuongPhiaSau > 0)
-            {
-                return $"Task này đang chặn {result.SoTaskBiAnhHuongPhiaSau} task phía sau. Nếu task này trễ, các task phụ thuộc phía sau có nguy cơ bị kéo trễ. Bottleneck score = {result.BottleneckScore:0.0000}.";
-            }
 
-            return $"Task này có bottleneck score = {result.BottleneckScore:0.0000}, mức ảnh hưởng hiện tại thấp.";
-        }
         private static DeXuatGiaoViecAI BuildStaffMatchEntity(
             AiTaskDataDto task,
             AiUserDataDto user,
@@ -384,7 +396,11 @@ namespace Infrastructure.Persistence.Repositories
                 TenMoHinh = StaffMatchingModelName,
                 DiemPhuHop = Round2(aiResult.XacSuatHieuQua),
                 DiemKyNang = Round2(user.DiemChatLuongTrungBinh),
+
+                // DiemKhoiLuong = mức độ còn rảnh.
+                // Ví dụ tải 80% thì còn rảnh 20%.
                 DiemKhoiLuong = Round2(1m - user.PhanTramTai),
+
                 DiemKinhNghiem = Round2((decimal)user.SoNamKinhNghiem),
                 LyDo = BuildStaffReason(aiResult, user),
                 DaChapNhan = false,
@@ -413,17 +429,116 @@ namespace Infrastructure.Persistence.Repositories
             };
         }
 
+        private static string BuildRiskImpact(TaskRiskAiResponse aiResult)
+        {
+            if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
+            {
+                return aiResult.NguyenNhan.Trim();
+            }
+
+            return aiResult.DuBaoTreHan
+                ? "Task co nguy co tre han"
+                : "Nguy co tre han thap";
+        }
+
+        private static string BuildRiskRecommendation(TaskRiskAiResponse aiResult)
+        {
+            var normalizedRiskLevel = NormalizeRiskLevel(aiResult.MucDoRuiRo);
+
+            if (aiResult.DuBaoTreHan || normalizedRiskLevel == "Cao")
+            {
+                return "Can xem lai han chot, khoi luong va nguoi phu trach.";
+            }
+
+            if (normalizedRiskLevel == "Trung binh")
+            {
+                return "Nen theo doi sat tien do va kiem tra tai hien tai cua nhan su.";
+            }
+
+            return "Tiep tuc theo doi tien do task.";
+        }
+
+        private static string BuildStaffReason(
+            StaffMatchAiResponse aiResult,
+            AiUserDataDto user)
+        {
+            var decision = aiResult.DeXuatGiaoViec
+                ? "AI de xuat giao viec"
+                : "AI khong de xuat giao viec";
+
+            var matchLevel = string.IsNullOrWhiteSpace(aiResult.MucDoPhuHop)
+                ? "Khong xac dinh"
+                : aiResult.MucDoPhuHop.Trim();
+
+            var workloadText =
+                $"Tai hien tai trong sprint: {user.KhoiLuongHienTai:0.##}/{user.KhoiLuongToiDa:0.##}h ({user.PhanTramTai:P0}).";
+
+            if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
+            {
+                return $"{decision}. Muc do phu hop: {matchLevel}. {workloadText} Ly do: {aiResult.NguyenNhan.Trim()}";
+            }
+
+            return $"{decision}. Muc do phu hop: {matchLevel}. {workloadText}";
+        }
+
+        private static string BuildBottleneckReason(BottleneckAiResponse result)
+        {
+            if (result.SoTaskBiAnhHuongPhiaSau > 0)
+            {
+                return $"Task này đang chặn {result.SoTaskBiAnhHuongPhiaSau} task phía sau. Nếu task này trễ, các task phụ thuộc phía sau có nguy cơ bị kéo trễ. Bottleneck score = {result.BottleneckScore:0.0000}.";
+            }
+
+            return $"Task này có bottleneck score = {result.BottleneckScore:0.0000}, mức ảnh hưởng hiện tại thấp.";
+        }
+
+        private static string BuildBottleneckRecommendation(BottleneckAiResponse result)
+        {
+            if (result.BottleneckScore >= 0.7)
+            {
+                return "Can uu tien xu ly task nay vi co nguy co gay tac nghen cho nhieu cong viec phia sau.";
+            }
+
+            if (result.BottleneckScore >= 0.4)
+            {
+                return "Nen theo doi task nay va dam bao cac phu thuoc duoc xu ly dung han.";
+            }
+
+            return "Tiep tuc theo doi, hien tai muc do diem nghen thap.";
+        }
+
+        private static string GetBottleneckSeverity(double score)
+        {
+            if (score >= 0.7)
+            {
+                return "Cao";
+            }
+
+            if (score >= 0.4)
+            {
+                return "Trung binh";
+            }
+
+            return "Thap";
+        }
+
         private static decimal CalculateWorkloadRatio(decimal current, decimal max)
         {
-            if (max <= 0)
+            if (max <= 0m)
             {
                 return 0m;
             }
 
             var ratio = current / max;
 
-            if (ratio < 0m) return 0m;
-            if (ratio > 1m) return 1m;
+            if (ratio < 0m)
+            {
+                return 0m;
+            }
+
+            if (ratio > 1m)
+            {
+                return 1m;
+            }
 
             return ratio;
         }
@@ -465,54 +580,6 @@ namespace Infrastructure.Persistence.Repositories
             }
 
             return normalized;
-        }
-
-        private static string BuildStaffReason(StaffMatchAiResponse aiResult, AiUserDataDto user)
-        {
-            var decision = aiResult.DeXuatGiaoViec
-                ? "AI de xuat giao viec"
-                : "AI khong de xuat giao viec";
-
-            var matchLevel = string.IsNullOrWhiteSpace(aiResult.MucDoPhuHop)
-                ? "Khong xac dinh"
-                : aiResult.MucDoPhuHop.Trim();
-
-            if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
-            {
-                return $"{decision}. Muc do phu hop: {matchLevel}. Ly do: {aiResult.NguyenNhan.Trim()}";
-            }
-
-            return $"{decision}. Muc do phu hop: {matchLevel}. Tai hien tai: {user.PhanTramTai:P0}.";
-        }
-
-        private static string GetBottleneckSeverity(double score)
-        {
-            if (score >= 0.7)
-            {
-                return "Cao";
-            }
-
-            if (score >= 0.4)
-            {
-                return "Trung binh";
-            }
-
-            return "Thap";
-        }
-
-        private static string BuildBottleneckRecommendation(BottleneckAiResponse result)
-        {
-            if (result.BottleneckScore >= 0.7)
-            {
-                return "Can uu tien xu ly task nay vi co nguy co gay tac nghen cho nhieu cong viec phia sau.";
-            }
-
-            if (result.BottleneckScore >= 0.4)
-            {
-                return "Nen theo doi task nay va dam bao cac phu thuoc duoc xu ly dung han.";
-            }
-
-            return "Tiep tuc theo doi, hien tai muc do diem nghen thap.";
         }
     }
 }

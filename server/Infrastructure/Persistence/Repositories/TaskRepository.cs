@@ -5,16 +5,14 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Data;
 
 namespace Infrastructure.Persistence.Repositories
 {
     public class TaskRepository : ITaskRepository
     {
         private const string StatusDone = "Hoan thanh";
-        private const string StatusCanceled = "Da huy";
 
         private readonly QuanLyDuAnAiContext _context;
 
@@ -22,97 +20,6 @@ namespace Infrastructure.Persistence.Repositories
         {
             _context = context;
         }
-        private sealed record WorkloadSnapshot(
-    int? AssigneeId,
-    decimal EstimatedHours,
-    string? Status);
-
-        private static WorkloadSnapshot EmptyWorkloadSnapshot()
-        {
-            return new WorkloadSnapshot(null, 0m, null);
-        }
-
-        private static WorkloadSnapshot GetWorkloadSnapshot(CongViec task)
-        {
-            return new WorkloadSnapshot(
-                task.MaNguoiPhuTrach,
-                task.SoGioUocTinh ?? 0m,
-                task.TrangThai);
-        }
-
-        private static decimal GetActiveWorkloadHours(WorkloadSnapshot snapshot)
-        {
-            if (!snapshot.AssigneeId.HasValue)
-            {
-                return 0m;
-            }
-
-            if (!IsActiveForWorkload(snapshot.Status))
-            {
-                return 0m;
-            }
-
-            if (snapshot.EstimatedHours <= 0m)
-            {
-                return 0m;
-            }
-
-            return snapshot.EstimatedHours;
-        }
-
-        private async Task ApplyWorkloadTransitionAsync(
-            WorkloadSnapshot oldState,
-            WorkloadSnapshot newState,
-            CancellationToken cancellationToken)
-        {
-            var oldHours = GetActiveWorkloadHours(oldState);
-            var newHours = GetActiveWorkloadHours(newState);
-
-            if (oldState.AssigneeId == newState.AssigneeId)
-            {
-                var delta = newHours - oldHours;
-
-                if (oldState.AssigneeId.HasValue && delta != 0m)
-                {
-                    await AdjustUserWorkloadAsync(
-                        oldState.AssigneeId.Value,
-                        delta,
-                        cancellationToken);
-                }
-
-                return;
-            }
-
-            if (oldState.AssigneeId.HasValue && oldHours > 0m)
-            {
-                await AdjustUserWorkloadAsync(
-                    oldState.AssigneeId.Value,
-                    -oldHours,
-                    cancellationToken);
-            }
-
-            if (newState.AssigneeId.HasValue && newHours > 0m)
-            {
-                await AdjustUserWorkloadAsync(
-                    newState.AssigneeId.Value,
-                    newHours,
-                    cancellationToken);
-            }
-        }
-
-        private Task<CongViec?> GetTaskForUpdateAsync(
-            int id,
-            CancellationToken cancellationToken)
-        {
-            return _context.CongViecs
-                .FromSqlInterpolated($"""
-            SELECT *
-            FROM CongViec WITH (UPDLOCK, ROWLOCK)
-            WHERE MaCongViec = {id}
-            """)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
 
         public async Task<IReadOnlyList<TaskListItemDto>> GetListAsync(
             TaskQueryParameters query,
@@ -191,7 +98,6 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-
         public async Task<TaskDetailDto?> GetByIdAsync(
             int id,
             CancellationToken cancellationToken = default)
@@ -237,12 +143,9 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         public async Task<int> CreateAsync(
-      CreateTaskRequest request,
-      CancellationToken cancellationToken = default)
+            CreateTaskRequest request,
+            CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database
-                .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
             var entity = new CongViec
             {
                 MaDuAn = request.MaDuAn,
@@ -264,33 +167,23 @@ namespace Infrastructure.Persistence.Repositories
 
             _context.CongViecs.Add(entity);
 
-            await ApplyWorkloadTransitionAsync(
-                EmptyWorkloadSnapshot(),
-                GetWorkloadSnapshot(entity),
-                cancellationToken);
-
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
 
             return entity.MaCongViec;
         }
 
         public async Task<bool> UpdateAsync(
-     int id,
-     UpdateTaskRequest request,
-     CancellationToken cancellationToken = default)
+            int id,
+            UpdateTaskRequest request,
+            CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database
-                .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
-            var entity = await GetTaskForUpdateAsync(id, cancellationToken);
+            var entity = await _context.CongViecs
+                .FirstOrDefaultAsync(x => x.MaCongViec == id, cancellationToken);
 
             if (entity == null)
             {
                 return false;
             }
-
-            var oldState = GetWorkloadSnapshot(entity);
 
             entity.MaDuAn = request.MaDuAn;
             entity.MaSprint = request.MaSprint;
@@ -308,62 +201,42 @@ namespace Infrastructure.Persistence.Repositories
             entity.TienDo = request.TienDo;
             entity.NgayCapNhat = DateTime.UtcNow;
 
-            var newState = GetWorkloadSnapshot(entity);
-
-            await ApplyWorkloadTransitionAsync(
-                oldState,
-                newState,
-                cancellationToken);
-
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
 
             return true;
         }
 
         public async Task<bool> DeleteAsync(
-     int id,
-     CancellationToken cancellationToken = default)
+            int id,
+            CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database
-                .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
-            var entity = await GetTaskForUpdateAsync(id, cancellationToken);
+            var entity = await _context.CongViecs
+                .FirstOrDefaultAsync(x => x.MaCongViec == id, cancellationToken);
 
             if (entity == null)
             {
                 return false;
             }
 
-            await ApplyWorkloadTransitionAsync(
-                GetWorkloadSnapshot(entity),
-                EmptyWorkloadSnapshot(),
-                cancellationToken);
-
             _context.CongViecs.Remove(entity);
 
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
 
             return true;
         }
 
         public async Task<bool> UpdateStatusAsync(
-    int id,
-    UpdateTaskStatusRequest request,
-    CancellationToken cancellationToken = default)
+            int id,
+            UpdateTaskStatusRequest request,
+            CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database
-                .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
-            var entity = await GetTaskForUpdateAsync(id, cancellationToken);
+            var entity = await _context.CongViecs
+                .FirstOrDefaultAsync(x => x.MaCongViec == id, cancellationToken);
 
             if (entity == null)
             {
                 return false;
             }
-
-            var oldState = GetWorkloadSnapshot(entity);
 
             entity.TrangThai = request.TrangThai;
             entity.NgayCapNhat = DateTime.UtcNow;
@@ -379,77 +252,28 @@ namespace Infrastructure.Persistence.Repositories
                 entity.NgayHoanThanh ??= DateOnly.FromDateTime(DateTime.Today);
             }
 
-            var newState = GetWorkloadSnapshot(entity);
-
-            await ApplyWorkloadTransitionAsync(
-                oldState,
-                newState,
-                cancellationToken);
-
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
 
             return true;
         }
-        private async Task AdjustUserWorkloadAsync(
-    int userId,
-    decimal delta,
-    CancellationToken cancellationToken)
-        {
-            await _context.Database.ExecuteSqlInterpolatedAsync($"""
-        UPDATE NguoiDung
-        SET KhoiLuongHienTai =
-            CASE
-                WHEN ISNULL(KhoiLuongHienTai, 0) + {delta} < 0 THEN 0
-                ELSE ISNULL(KhoiLuongHienTai, 0) + {delta}
-            END
-        WHERE MaNguoiDung = {userId}
-        """,
-                cancellationToken);
-        }
-
-        private static bool IsActiveForWorkload(string? status)
-        {
-            return !string.Equals(
-                       status?.Trim(),
-                       StatusDone,
-                       StringComparison.OrdinalIgnoreCase)
-                   &&
-                   !string.Equals(
-                       status?.Trim(),
-                       StatusCanceled,
-                       StringComparison.OrdinalIgnoreCase);
-        }
 
         public async Task<bool> AssignAsync(
-    int id,
-    AssignTaskRequest request,
-    CancellationToken cancellationToken = default)
+            int id,
+            AssignTaskRequest request,
+            CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database
-                .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
-            var entity = await GetTaskForUpdateAsync(id, cancellationToken);
+            var entity = await _context.CongViecs
+                .FirstOrDefaultAsync(x => x.MaCongViec == id, cancellationToken);
 
             if (entity == null)
             {
                 return false;
             }
 
-            var oldState = GetWorkloadSnapshot(entity);
-
             entity.MaNguoiPhuTrach = request.MaNguoiPhuTrach;
             entity.NgayCapNhat = DateTime.UtcNow;
 
-            var newState = GetWorkloadSnapshot(entity);
-
-            await ApplyWorkloadTransitionAsync(
-                oldState,
-                newState,
-                cancellationToken);
-
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
 
             return true;
         }
