@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Application.Common.DTOs.Dashboard
 {
@@ -24,7 +20,10 @@ namespace Application.Common.DTOs.Dashboard
             public string HoTen { get; set; } = string.Empty;
             public int SoTask { get; set; }
             public decimal TongGioUocTinh { get; set; }
+
+            // Đơn vị: phần trăm, ví dụ 75 nghĩa là 75%.
             public decimal PhanTramTai { get; set; }
+
             public string MucDoTai { get; set; } = string.Empty;
         }
 

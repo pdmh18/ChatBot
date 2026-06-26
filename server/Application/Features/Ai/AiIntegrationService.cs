@@ -43,7 +43,7 @@ namespace Application.Features.Ai
                 task.MaNguoiPhuTrach.Value,
                 task.MaDuAn,
                 task.MaSprint,
-                task.MaCongViec,
+                excludedTaskId: null,
                 cancellationToken);
 
             if (user == null)
@@ -60,8 +60,8 @@ namespace Application.Features.Ai
                 SoGioUocTinh = ToDouble(task.SoGioUocTinh),
                 SoNamKinhNghiemNhanSu = user.SoNamKinhNghiem,
 
-                // Giữ nguyên field gửi sang ai_server.
-                // Nhưng giá trị đã được backend tính theo project + sprint của task.
+                // Field gửi sang ai_server giữ nguyên.
+                // Giá trị này là tỷ lệ tải theo project + sprint, lấy từ view workload.
                 KhoiLuongHienTaiNhanSu = ToDouble(user.PhanTramTai),
 
                 SoCongViecPhuThuocTruoc = dependencyCount,
@@ -173,11 +173,15 @@ namespace Application.Features.Ai
             int userId,
             CancellationToken cancellationToken)
         {
+            int? excludedTaskId = task.MaNguoiPhuTrach == userId
+                ?null
+                : task.MaCongViec;
+
             var user = await _repository.GetUserDataAsync(
                 userId,
                 task.MaDuAn,
                 task.MaSprint,
-                task.MaCongViec,
+                excludedTaskId,
                 cancellationToken);
 
             if (user == null)

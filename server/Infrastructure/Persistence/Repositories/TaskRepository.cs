@@ -13,6 +13,7 @@ namespace Infrastructure.Persistence.Repositories
     public class TaskRepository : ITaskRepository
     {
         private const string StatusDone = "Hoan thanh";
+        private const string StatusCanceled = "Da huy";
 
         private readonly QuanLyDuAnAiContext _context;
 
@@ -57,6 +58,10 @@ namespace Infrastructure.Persistence.Repositories
             {
                 var status = query.Status.Trim();
                 dbQuery = dbQuery.Where(x => x.TrangThai == status);
+            }
+            else
+            {
+                dbQuery = dbQuery.Where(x => x.TrangThai != StatusCanceled);
             }
 
             if (!string.IsNullOrWhiteSpace(query.Priority))
@@ -218,7 +223,8 @@ namespace Infrastructure.Persistence.Repositories
                 return false;
             }
 
-            _context.CongViecs.Remove(entity);
+            entity.TrangThai = StatusCanceled;
+            entity.NgayCapNhat = DateTime.UtcNow;
 
             await _context.SaveChangesAsync(cancellationToken);
 
