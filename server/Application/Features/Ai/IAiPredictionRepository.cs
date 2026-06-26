@@ -1,8 +1,6 @@
 ﻿using Application.Common.DTOs.Ai;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Application.Features.Ai
@@ -15,6 +13,9 @@ namespace Application.Features.Ai
 
         Task<AiUserDataDto?> GetUserDataAsync(
             int userId,
+            int projectId,
+            int? sprintId,
+            int? excludedTaskId,
             CancellationToken cancellationToken = default);
 
         Task<int> CountPreviousDependenciesAsync(
