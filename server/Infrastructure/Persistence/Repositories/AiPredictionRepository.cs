@@ -440,13 +440,31 @@ namespace Infrastructure.Persistence.Repositories
 
         private static string NormalizeRiskLevel(string? value)
         {
-            return value switch
+            if (string.IsNullOrWhiteSpace(value))
             {
-                "Thấp" => "Thap",
-                "Trung bình" => "Trung binh",
-                "Cao" => "Cao",
-                _ => value ?? "Khong xac dinh"
-            };
+                return "Khong xac dinh";
+            }
+
+            var normalized = value.Trim();
+
+            if (string.Equals(normalized, "Thấp", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "Thap", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Thap";
+            }
+
+            if (string.Equals(normalized, "Trung bình", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "Trung binh", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Trung binh";
+            }
+
+            if (string.Equals(normalized, "Cao", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Cao";
+            }
+
+            return normalized;
         }
 
         private static string BuildStaffReason(StaffMatchAiResponse aiResult, AiUserDataDto user)

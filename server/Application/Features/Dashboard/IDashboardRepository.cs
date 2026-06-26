@@ -15,7 +15,8 @@ namespace Application.Features.Dashboard
         CancellationToken cancellationToken = default);
 
         Task<int> CountLatestBottleneckBatchAsync(
-            int? projectId,
-            CancellationToken cancellationToken = default);
+    int? projectId,
+    int? sprintId,
+    CancellationToken cancellationToken = default);
     }
 }

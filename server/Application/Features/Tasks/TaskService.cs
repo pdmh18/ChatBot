@@ -261,11 +261,18 @@ namespace Application.Features.Tasks
                 }
             }
         }
+        private static string GenerateTaskCode()
+        {
+            var suffix = Guid.NewGuid()
+                .ToString("N")[..12]
+                .ToUpperInvariant();
 
+            return $"TASK-{suffix}";
+        }
         private static void NormalizeCreateRequest(CreateTaskRequest request)
         {
             request.MaCongViecCode = string.IsNullOrWhiteSpace(request.MaCongViecCode)
-    ? $"TASK-{DateTime.UtcNow:yyyyMMddHHmmssfff}"
+    ? GenerateTaskCode()
     : request.MaCongViecCode.Trim();
             request.TenCongViec = request.TenCongViec?.Trim() ?? string.Empty;
             request.MaCongViecCode = request.MaCongViecCode?.Trim();
@@ -391,7 +398,8 @@ namespace Application.Features.Tasks
 
         private static bool IsDoneStatus(string? status)
         {
-            return IsSameValue(status, StatusDone);
+            return IsSameValue(status, StatusDone)
+                || IsSameValue(status, StatusCanceled);
         }
 
         private static int CalculateRisk(

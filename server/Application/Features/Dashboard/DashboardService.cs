@@ -36,8 +36,9 @@ namespace Application.Features.Dashboard
             ApplyRisk(tasks);
 
             var bottleneckCount = await _repository.CountLatestBottleneckBatchAsync(
-                projectId,
-                cancellationToken);
+    projectId,
+    sprintId,
+    cancellationToken);
 
             return new DashboardSummaryDto
             {
@@ -145,6 +146,11 @@ namespace Application.Features.Dashboard
                 task.RiskLevel = GetRiskLevel(task.RiskPercent);
             }
         }
+        private static bool IsInactiveStatus(string? status)
+        {
+            return IsSame(status, StatusDone)
+                || IsSame(status, StatusCanceled);
+        }
 
         private static int CalculateRisk(
             DateOnly? deadline,
@@ -152,7 +158,7 @@ namespace Application.Features.Dashboard
             string? priority,
             int? progress)
         {
-            if (IsSame(status, StatusDone))
+            if (IsInactiveStatus(status))
             {
                 return 0;
             }

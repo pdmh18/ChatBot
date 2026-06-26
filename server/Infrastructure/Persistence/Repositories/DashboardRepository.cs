@@ -61,8 +61,9 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         public async Task<int> CountLatestBottleneckBatchAsync(
-            int? projectId,
-            CancellationToken cancellationToken = default)
+    int? projectId,
+    int? sprintId,
+    CancellationToken cancellationToken = default)
         {
             var query = _context.DiemNghenAIs
                 .AsNoTracking()
@@ -71,6 +72,13 @@ namespace Infrastructure.Persistence.Repositories
             if (projectId.HasValue)
             {
                 query = query.Where(x => x.MaDuAn == projectId.Value);
+            }
+
+            if (sprintId.HasValue)
+            {
+                query = query.Where(x =>
+                    x.MaCongViecNavigation != null &&
+                    x.MaCongViecNavigation.MaSprint == sprintId.Value);
             }
 
             var latestTime = await query
