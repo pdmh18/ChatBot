@@ -215,7 +215,7 @@ def main():
     print("\n📌 [2/3] Dataset Đề Xuất Giao Việc")
     print("-" * 40)
 
-    assign_df = doc_file_csv("dataset_de_xuat_giao_viec.csv", sep="\t")
+    assign_df = doc_file_csv("dataset_de_xuat_giao_viec.csv")
     assign_df = assign_df.dropna(subset=[ASSIGN_LABEL_COL])
     assign_df = lam_giau_khoi_luong(assign_df, col="PhanTramTaiNhanSu")
     assign_df = fill_null_features(assign_df, ASSIGN_FEATURE_COLS)

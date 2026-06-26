@@ -221,14 +221,61 @@ def predict_staff_match(task_features: dict, model=None, threshold=None) -> dict
 
     proba = model.predict_proba(X)[0, 1]
     label = int(proba >= threshold)
-    muc_do_phu_hop = "Cao" if label else (
-        "Trung bình" if proba >= threshold * 0.8 else "Thấp"
-    )
+    # muc_do_phu_hop = "Cao" if label else (
+    #     "Trung bình" if proba >= threshold * 0.8 else "Thấp"
+    # )
+
+    # return {
+    #     "xac_suat_hieu_qua":  round(float(proba), 4),
+    #     "de_xuat_giao_viec":  bool(label),
+    #     "muc_do_phu_hop":     muc_do_phu_hop,
+    # }
+    # Tính lý do đề xuất
+    reasons = []
+
+    so_gio    = task_features.get("SoGioUocTinh", 0)
+    tai_nhan  = task_features.get("PhanTramTaiNhanSu", 0)
+    diem_cl   = task_features.get("DiemChatLuongTrungBinhLichSu", 0)
+
+    if diem_cl >= 8.0:
+        reasons.append(f"Điểm chất lượng lịch sử cao ({diem_cl:.1f}/10)")
+    elif diem_cl >= 7.0:
+        reasons.append(f"Điểm chất lượng lịch sử trung bình ({diem_cl:.1f}/10)")
+    else:
+        reasons.append(f"Điểm chất lượng lịch sử thấp ({diem_cl:.1f}/10)")
+
+    if tai_nhan <= 0.3:
+        reasons.append(f"Nhân sự đang rảnh ({int(tai_nhan*100)}% tải)")
+    elif tai_nhan <= 0.6:
+        reasons.append(f"Nhân sự còn khả năng nhận việc ({int(tai_nhan*100)}% tải)")
+    else:
+        reasons.append(f"Nhân sự đang bận ({int(tai_nhan*100)}% tải)")
+
+    if so_gio <= 16:
+        reasons.append(f"Task nhỏ ({int(so_gio)}h) — phù hợp giao nhanh")
+    elif so_gio <= 32:
+        reasons.append(f"Task vừa ({int(so_gio)}h)")
+    else:
+        reasons.append(f"Task lớn ({int(so_gio)}h) — cần nhân sự kinh nghiệm")
+
+    if not reasons:
+        reasons.append("Không có yếu tố nổi bật")
+
+    nguyen_nhan = " & ".join(reasons)
+
+    low_cutoff, high_cutoff = sorted((float(threshold), 0.7))
+    if proba >= high_cutoff:
+        muc_do_phu_hop = "Cao"
+    elif proba >= low_cutoff:
+        muc_do_phu_hop = "Trung bình"
+    else:
+        muc_do_phu_hop = "Thấp"
 
     return {
-        "xac_suat_hieu_qua":  round(float(proba), 4),
-        "de_xuat_giao_viec":  bool(label),
-        "muc_do_phu_hop":     muc_do_phu_hop,
+        "xac_suat_hieu_qua": round(float(proba), 4),
+        "de_xuat_giao_viec": bool(label),
+        "muc_do_phu_hop":    muc_do_phu_hop,
+        "nguyen_nhan":       nguyen_nhan,
     }
 
 if __name__ == "__main__":

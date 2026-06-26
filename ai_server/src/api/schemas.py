@@ -33,6 +33,7 @@ class StaffMatchResponse(BaseModel):
     xac_suat_hieu_qua: float
     de_xuat_giao_viec: bool
     muc_do_phu_hop: str
+    nguyen_nhan: str
 
 
 # ============================================================
