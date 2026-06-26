@@ -263,9 +263,10 @@ def predict_staff_match(task_features: dict, model=None, threshold=None) -> dict
 
     nguyen_nhan = " & ".join(reasons)
 
-    if proba >= max(threshold, 0.7):
+    low_cutoff, high_cutoff = sorted((float(threshold), 0.7))
+    if proba >= high_cutoff:
         muc_do_phu_hop = "Cao"
-    elif proba >= threshold:
+    elif proba >= low_cutoff:
         muc_do_phu_hop = "Trung bình"
     else:
         muc_do_phu_hop = "Thấp"
