@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AssigneeSuggestion, BottleneckResult, LateRisk, StaffMatchResult } from '../../models/ai';
 import { DashboardTaskAlert } from '../../models/dashboard';
@@ -30,6 +30,7 @@ export class AiAlerts implements OnInit {
   @ViewChild('bottleneckSection') bottleneckSection?: ElementRef<HTMLElement>;
 
   readonly defaultVisibleAlertCount = 5;
+  readonly lateRiskVisibleAlertCount = 6;
   lateRisks: ExplainableLateRisk[] = [];
   visibleLateRisks: ExplainableLateRisk[] = [];
   showAllLateRisks = false;
@@ -48,6 +49,7 @@ export class AiAlerts implements OnInit {
 
   private selectedProjectId?: number;
   private selectedSprintId?: number;
+  private suggestionsRequestId = 0;
 
   constructor(
     private route: ActivatedRoute,
@@ -86,7 +88,7 @@ export class AiAlerts implements OnInit {
   }
 
   get hasHiddenLateRisks(): boolean {
-    return this.lateRisks.length > this.defaultVisibleAlertCount;
+    return this.lateRisks.length > this.lateRiskVisibleAlertCount;
   }
 
   get hasHiddenBottlenecks(): boolean {
@@ -115,7 +117,7 @@ export class AiAlerts implements OnInit {
   private updateVisibleLateRisks(): void {
     this.visibleLateRisks = this.showAllLateRisks
       ? this.lateRisks
-      : this.lateRisks.slice(0, this.defaultVisibleAlertCount);
+      : this.lateRisks.slice(0, this.lateRiskVisibleAlertCount);
   }
 
   private updateVisibleBottlenecks(): void {
@@ -136,14 +138,49 @@ export class AiAlerts implements OnInit {
 
   openBottleneckAlert(item: BottleneckResult): void {
     this.selectedBottleneck = item;
+    document.body.classList.add('ai-alert-modal-open');
+    this.cdr.detectChanges();
   }
 
-  closeBottleneckAlert(): void {
+  closeBottleneckAlert(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
     this.selectedBottleneck = null;
+    document.body.classList.remove('ai-alert-modal-open');
+    this.cdr.detectChanges();
+  }
+
+  onModalContentClick(event: Event): void {
+    event.stopPropagation();
+  }
+
+  @HostListener('document:keydown.escape')
+  handleEscapeKey(): void {
+    if (this.selectedBottleneck) {
+      this.closeBottleneckAlert();
+    }
   }
 
   getRiskPercent(item: LateRisk): number {
     return Math.round(item.risk);
+  }
+
+  getLateRiskLabel(item: LateRisk): string {
+    const risk = this.getRiskPercent(item);
+    if (risk >= 85) return 'Cần xử lý ngay hôm nay';
+    if (risk >= 75) return 'Ưu tiên cao';
+    if (risk >= 55) return 'Cần theo dõi';
+    return 'Rủi ro thấp';
+  }
+
+  getBottleneckTitle(item: BottleneckResult): string {
+    if (item.tenCongViec?.trim()) return item.tenCongViec.trim();
+    return `Task #${item.maCongViec || 'N/A'}`;
+  }
+
+  goToAssignmentCompare(): void {
+    this.router.navigate(['/assignment-compare'], { queryParams: this.buildRouteParams() });
+    this.closeBottleneckAlert();
   }
 
   getBottleneckImpact(item: BottleneckResult): number {
@@ -158,6 +195,97 @@ export class AiAlerts implements OnInit {
     return Math.max(0, Number(value) || 0);
   }
 
+
+  countCriticalLateRisks(): number {
+    return this.lateRisks.filter((item) => item.risk >= 75).length;
+  }
+
+  getHighestLateRisk(): number {
+    return this.lateRisks.length ? Math.max(...this.lateRisks.map((item) => this.getRiskPercent(item))) : 0;
+  }
+
+  getTopLateRiskTaskName(): string {
+    return this.lateRisks[0]?.task || 'Chưa có dữ liệu';
+  }
+
+  getMaxBottleneckImpact(): number {
+    return this.bottleneckResults.length
+      ? Math.max(...this.bottleneckResults.map((item) => this.getBottleneckImpact(item)))
+      : 0;
+  }
+
+  getTopBottleneckScore(): string {
+    return this.bottleneckResults.length ? this.formatBottleneckScore(this.bottleneckResults[0]) : '0.00';
+  }
+
+  getBestSuggestionScore(): number {
+    return this.suggestions.length ? Math.max(...this.suggestions.map((item) => item.score)) : 0;
+  }
+
+  getBestSuggestionDeveloper(): string {
+    return this.suggestions[0]?.developer || 'Chưa có dữ liệu';
+  }
+
+  getTaskNumber(item: BottleneckResult): string {
+    return String(item.maCongViec || 'N/A');
+  }
+
+  getBottleneckShortTitle(item: BottleneckResult | null): string {
+    if (!item) return 'Task';
+    const title = this.getBottleneckTitle(item).replace(/^Task\s*#?\d+$/i, `Task ${this.getTaskNumber(item)}`);
+    return title.length > 22 ? `${title.slice(0, 19)}...` : title;
+  }
+
+  getImpactedTasksLabel(item: BottleneckResult | null): string {
+    if (!item) return '0 task';
+    const impact = this.getBottleneckImpact(item);
+    return `${impact} task`;
+  }
+
+  getExtraImpactedTasks(item: BottleneckResult): number {
+    return Math.max(0, this.getBottleneckImpact(item) - 1);
+  }
+
+  getPrimaryImpactedLabel(item: BottleneckResult): string {
+    return this.getBottleneckImpact(item) > 0 ? '1 task' : '0 task';
+  }
+
+  getRemainingImpactedLabel(item: BottleneckResult): string {
+    const remaining = this.getExtraImpactedTasks(item);
+    return remaining > 0 ? `+${remaining} task` : 'không thêm';
+  }
+
+  formatBottleneckScore(item: BottleneckResult): string {
+    const raw = Number(item.bottleneckScore ?? 0);
+    if (!Number.isFinite(raw) || raw <= 0) return 'N/A';
+    return raw <= 1 ? raw.toFixed(3) : raw.toFixed(1);
+  }
+
+  formatDelayDays(item: BottleneckResult): string {
+    const days = Number(item.soNgayTreDuBao ?? 0);
+    if (!Number.isFinite(days) || days <= 0) return 'Chưa xác định';
+    return `${Math.round(days)} ngày`;
+  }
+
+  normalizeBar(value?: number | null): number {
+    const numericValue = Number(value ?? 0);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.max(0, Math.min(100, Math.round(numericValue)));
+  }
+
+  normalizeExperienceBar(value?: number | null): number {
+    const numericValue = Number(value ?? 0);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.max(8, Math.min(100, Math.round(numericValue * 10)));
+  }
+
+  getInitials(name?: string | null): string {
+    const cleanName = (name || 'AI').trim();
+    const words = cleanName.split(/\s+/).filter(Boolean);
+    if (!words.length) return 'AI';
+    return words.slice(-2).map((word) => word.charAt(0).toUpperCase()).join('');
+  }
+
   private loadAlerts(): void {
     this.lateRisks = [];
     this.visibleLateRisks = [];
@@ -165,6 +293,9 @@ export class AiAlerts implements OnInit {
     this.visibleBottlenecks = [];
     this.suggestions = [];
     this.visibleSuggestions = [];
+    this.suggestionsMessage = '';
+    this.isSuggestionsLoading = false;
+    this.suggestionsRequestId += 1;
 
     if (this.filter === 'late-risk') {
       this.loadLateRisks();
@@ -224,6 +355,7 @@ export class AiAlerts implements OnInit {
 
   private loadSuggestionsForTopRiskyTasks(riskyTasks: SuggestionSourceTask[]): void {
     const topTasks = [...riskyTasks].sort((a, b) => b.riskScore - a.riskScore).slice(0, 5);
+    const requestId = ++this.suggestionsRequestId;
 
     if (!topTasks.length) {
       this.suggestions = [];
@@ -236,51 +368,54 @@ export class AiAlerts implements OnInit {
 
     this.suggestions = [];
     this.visibleSuggestions = [];
+    this.showAllSuggestions = false;
     this.isSuggestionsLoading = true;
-    this.suggestionsMessage = 'AI đang phân tích gợi ý phân công cho các task rủi ro cao...';
+    this.suggestionsMessage = `Đang tải gợi ý giao việc 0/${topTasks.length} task rủi ro cao...`;
     this.cdr.detectChanges();
 
     let completed = 0;
     let failed = 0;
-    const allSuggestions: AssigneeSuggestion[] = [];
 
     topTasks.forEach((task) => {
       this.aiService.suggestAssignees(task.id).subscribe({
         next: (results) => {
+          if (requestId !== this.suggestionsRequestId) return;
+
           const best = results[0];
 
           if (best) {
-            allSuggestions.push(this.mapStaffMatchToSuggestion(best, task));
+            this.suggestions = [...this.suggestions, this.mapStaffMatchToSuggestion(best, task)].sort(
+              (a, b) => b.score - a.score
+            );
+            this.updateVisibleSuggestions();
           }
 
           completed += 1;
-          this.checkSuggestionsComplete(topTasks.length, completed, failed, allSuggestions);
+          this.updateSuggestionsProgress(topTasks.length, completed, failed);
         },
         error: () => {
+          if (requestId !== this.suggestionsRequestId) return;
+
           failed += 1;
           completed += 1;
-          this.checkSuggestionsComplete(topTasks.length, completed, failed, allSuggestions);
+          this.updateSuggestionsProgress(topTasks.length, completed, failed);
         },
       });
     });
   }
 
-  private checkSuggestionsComplete(
-    total: number,
-    completed: number,
-    failed: number,
-    allSuggestions: AssigneeSuggestion[]
-  ): void {
-    if (completed < total) return;
+  private updateSuggestionsProgress(total: number, completed: number, failed: number): void {
+    if (completed < total) {
+      this.suggestionsMessage = `Đang tải gợi ý giao việc ${completed}/${total} task...`;
+      this.cdr.detectChanges();
+      return;
+    }
 
-    this.suggestions = allSuggestions.sort((a, b) => b.score - a.score);
-    this.showAllSuggestions = false;
-    this.updateVisibleSuggestions();
     this.isSuggestionsLoading = false;
 
     if (this.suggestions.length) {
       this.suggestionsMessage = failed
-        ? `Đã lấy được ${this.suggestions.length} gợi ý AI. ${failed} task chưa gọi được AI server.`
+        ? `Đã tải ${this.suggestions.length} gợi ý AI. ${failed} task chưa gọi được AI server.`
         : '';
     } else {
       this.suggestionsMessage = failed

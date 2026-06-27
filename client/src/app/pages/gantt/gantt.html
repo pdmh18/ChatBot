@@ -1,9 +1,13 @@
-﻿<h2>Gantt Chart</h2>
+<h2>Gantt Chart</h2>
+
+<div class="gantt-toolbar">
+  <p>Hiển thị tiến độ task theo deadline từ API Tasks.</p>
+
+  @if (emptyMessage) {
+    <span class="gantt-status">{{ emptyMessage }}</span>
+  }
+</div>
 
 <div class="gantt-wrapper">
-  @if (emptyMessage) {
-    <div class="gantt-empty">{{ emptyMessage }}</div>
-  }
-
-  <svg id="gantt"></svg>
+  <div id="gantt"></div>
 </div>

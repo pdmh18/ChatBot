@@ -30,7 +30,10 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss"]
+            "styles": [
+              "node_modules/frappe-gantt/dist/frappe-gantt.css",
+              "src/styles.scss"
+            ]
           },
           "configurations": {
             "production": {

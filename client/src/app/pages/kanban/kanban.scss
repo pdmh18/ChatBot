@@ -1,8 +1,8 @@
-﻿.kanban-message {
+.kanban-message {
   margin: 12px 0 16px;
   padding: 12px 14px;
   border: 1px solid #bfdbfe;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #eff6ff;
   color: #1d4ed8;
 }
@@ -16,7 +16,7 @@
 .kanban-column {
   background: #f1f5f9;
   border: 1px solid #e1e5ea;
-  border-radius: 8px;
+  border-radius: 14px;
   padding: 12px;
 }
 
@@ -54,9 +54,9 @@
 
 .task-card {
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 14px;
   background: white;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   cursor: grab;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
 }
@@ -129,7 +129,7 @@
   place-items: center;
   min-height: 120px;
   border: 1px dashed #cbd5e1;
-  border-radius: 8px;
+  border-radius: 14px;
   color: #64748b;
   background: rgba(255, 255, 255, 0.55);
 }
@@ -153,3 +153,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Manager UI polish */
+:host { display: block; color: var(--text-main); }
+.kanban-column, .task-card, .card, .panel {
+  border-radius: 18px !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+button, select, input { font-family: var(--app-font) !important; border-radius: 12px !important; }

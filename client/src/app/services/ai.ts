@@ -1,6 +1,6 @@
-﻿import { Injectable } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, map, shareReplay } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   AssigneeSuggestion,
@@ -16,6 +16,8 @@ import {
 })
 export class AiService {
   private readonly apiUrl = `${environment.apiUrl}/ai`;
+  private readonly suggestAssigneesCache = new Map<number, Observable<StaffMatchResult[]>>();
+  private readonly bottleneckCache = new Map<number, Observable<BottleneckResult[]>>();
 
   constructor(private http: HttpClient) {}
 
@@ -32,10 +34,15 @@ export class AiService {
   }
 
   suggestAssignees(taskId: number): Observable<StaffMatchResult[]> {
-    return this.http.post<StaffMatchResult[]>(
-      `${this.apiUrl}/tasks/${taskId}/suggest-assignees`,
-      {}
-    );
+    const cached = this.suggestAssigneesCache.get(taskId);
+    if (cached) return cached;
+
+    const request$ = this.http
+      .post<StaffMatchResult[]>(`${this.apiUrl}/tasks/${taskId}/suggest-assignees`, {})
+      .pipe(shareReplay({ bufferSize: 1, refCount: false }));
+
+    this.suggestAssigneesCache.set(taskId, request$);
+    return request$;
   }
 
   matchStaff(taskId: number, userId: number): Observable<StaffMatchResult> {
@@ -53,14 +60,22 @@ export class AiService {
   }
 
   analyzeBottlenecks(topN = 10): Observable<BottleneckResult[]> {
-    const params = new HttpParams().set('topN', topN);
+    const cached = this.bottleneckCache.get(topN);
+    if (cached) return cached;
 
-    return this.http
+    const params = new HttpParams().set('topN', topN);
+    const request$ = this.http
       .post<BottleneckResult[] | { value?: BottleneckResult[] }>(
         `${this.apiUrl}/bottlenecks/analyze`,
         {},
         { params }
       )
-      .pipe(map((response) => (Array.isArray(response) ? response : response.value ?? [])));
+      .pipe(
+        map((response) => (Array.isArray(response) ? response : response.value ?? [])),
+        shareReplay({ bufferSize: 1, refCount: false })
+      );
+
+    this.bottleneckCache.set(topN, request$);
+    return request$;
   }
 }

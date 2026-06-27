@@ -128,6 +128,13 @@
           <strong>{{ selectedTask.riskScore }}% - {{ selectedTask.riskLevel }}</strong>
         </div>
 
+        @if (selectedTask.aiReason) {
+          <div class="detail-item full">
+            <span>Lý do AI</span>
+            <strong>{{ selectedTask.aiReason }}</strong>
+          </div>
+        }
+
         <div class="detail-item full">
           <span>Mô tả</span>
           <strong>{{ selectedTask.description || 'Chưa có mô tả' }}</strong>
@@ -193,6 +200,45 @@
           <div class="ai-message">{{ aiSuggestionMessage }}</div>
         }
 
+        <section class="ai-risk-panel">
+          <div class="section-title">
+            <span>Dự báo Risk AI</span>
+            <small>Hiển thị ngay khi mở modal gợi ý</small>
+          </div>
+
+          @if (riskResult) {
+            <div class="risk-result-card" [class.danger]="riskResult.duBaoTreHan">
+              <strong>
+                {{ riskResult.duBaoTreHan ? 'Task có nguy cơ trễ hạn' : 'Nguy cơ trễ hạn thấp' }}
+              </strong>
+              <p>Xác suất: {{ getRiskPercent(riskResult) }}%</p>
+              <p>Mức độ: {{ riskResult.mucDoRuiRo }}</p>
+              @if (riskResult.tacDongDuBao) {
+                <small><b>Tác động dự báo:</b> {{ riskResult.tacDongDuBao }}</small>
+              }
+              @if (riskResult.nguyenNhan) {
+                <small><b>Nguyên nhân:</b> {{ riskResult.nguyenNhan }}</small>
+              }
+              @if (riskResult.giaiThich) {
+                <small><b>Giải thích:</b> {{ riskResult.giaiThich }}</small>
+              }
+              @if (riskResult.khuyenNghi) {
+                <small><b>Khuyến nghị:</b> {{ riskResult.khuyenNghi }}</small>
+              }
+            </div>
+          } @else {
+            <div class="risk-result-card loading">
+              <strong>AI đang dự báo rủi ro task...</strong>
+              <p>Đang lấy xác suất trễ hạn, nguyên nhân và khuyến nghị từ AI.</p>
+            </div>
+          }
+        </section>
+
+        <div class="section-title">
+          <span>Nhân sự AI đề xuất</span>
+          <small>Dựa trên kỹ năng, kinh nghiệm và mức độ còn rảnh</small>
+        </div>
+
         @for (developer of suggestedDevelopers; track developer.id) {
           <div class="developer-card">
             <div class="developer-main">
@@ -229,22 +275,6 @@
             <button type="button" [disabled]="isSuggestionLoading" (click)="assignDeveloper(developer)">
               {{ isSuggestionLoading ? 'Đang xử lý' : 'Chọn' }}
             </button>
-          </div>
-        }
-
-        @if (riskResult) {
-          <div class="risk-result-card" [class.danger]="riskResult.duBaoTreHan">
-            <strong>
-              {{ riskResult.duBaoTreHan ? 'Task có nguy cơ trễ hạn' : 'Nguy cơ trễ hạn thấp' }}
-            </strong>
-            <p>Xác suất: {{ getRiskPercent(riskResult) }}%</p>
-            <p>Mức độ: {{ riskResult.mucDoRuiRo }}</p>
-            @if (riskResult.tacDongDuBao) {
-              <small><b>Nguyên nhân:</b> {{ riskResult.tacDongDuBao }}</small>
-            }
-            @if (riskResult.khuyenNghi) {
-              <small><b>Khuyến nghị:</b> {{ riskResult.khuyenNghi }}</small>
-            }
           </div>
         }
       </div>
@@ -357,8 +387,6 @@
     </div>
   </div>
 }
-
-
 
 
 

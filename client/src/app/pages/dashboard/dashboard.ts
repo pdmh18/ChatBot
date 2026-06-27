@@ -1,4 +1,4 @@
-﻿import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 import { BaseChartDirective } from 'ng2-charts';
@@ -15,7 +15,7 @@ interface DashboardStat {
   value: number;
   type?: 'warning' | 'danger' | 'success';
   description?: string;
-  target?: 'late-risk' | 'bottleneck' | 'unassigned' | 'completed' | 'active';
+  target?: 'tasks' | 'late-risk' | 'bottleneck' | 'unassigned' | 'completed' | 'active';
 }
 
 interface HighRiskTask {
@@ -29,10 +29,13 @@ interface HighRiskTask {
 
 interface BottleneckSummary {
   id: number;
+  taskId?: number | null;
   name: string;
   blockedTasks: number;
   severity: 'High' | 'Medium' | 'Low';
   reason: string;
+  aiScore: number;
+  recommendation?: string | null;
 }
 
 @Component({
@@ -70,6 +73,8 @@ export class Dashboard implements OnInit {
   highRiskTasks: HighRiskTask[] = [];
   topBottlenecks: BottleneckSummary[] = [];
   bottleneckSourceMessage = '';
+  selectedBottleneck?: BottleneckSummary;
+  graphModalOpen = false;
 
   private selectedProjectId?: number;
   private selectedSprintId?: number;
@@ -95,6 +100,11 @@ export class Dashboard implements OnInit {
 
   openStat(stat: DashboardStat): void {
     if (!stat.target) return;
+
+    if (stat.target === 'tasks') {
+      this.router.navigate(['/tasks'], { queryParams: this.buildRouteParams() });
+      return;
+    }
 
     if (stat.target === 'late-risk') {
       this.openHighRiskDetails();
@@ -125,10 +135,44 @@ export class Dashboard implements OnInit {
     });
   }
 
-  openBottleneckDetails(): void {
-    this.router.navigate(['/ai-alerts'], {
-      queryParams: { ...this.buildRouteParams(), type: 'bottleneck', focus: 'bottleneck' },
-    });
+  openBottleneckDetails(item?: BottleneckSummary): void {
+    const queryParams: Record<string, number | string> = {
+      ...this.buildRouteParams(),
+      type: 'bottleneck',
+      focus: 'bottleneck',
+    };
+
+    if (item?.taskId) {
+      queryParams['taskId'] = item.taskId;
+    }
+
+    this.router.navigate(['/ai-alerts'], { queryParams });
+  }
+
+  closeGraphModal(): void {
+    this.graphModalOpen = false;
+  }
+
+  getGraphTaskLabel(item?: BottleneckSummary): string {
+    return item?.taskId ? `Task #${item.taskId}` : item?.name || 'Task nghẽn';
+  }
+
+  getAiScorePercent(item?: BottleneckSummary): number {
+    return Math.round((item?.aiScore ?? 0) * 1000) / 10;
+  }
+
+  getImpactBarWidth(item?: BottleneckSummary): number {
+    const maxBlockedTasks = Math.max(...this.topBottlenecks.map((bottleneck) => bottleneck.blockedTasks), 1);
+    const blockedWeight = ((item?.blockedTasks ?? 0) / maxBlockedTasks) * 70;
+    const scoreWeight = (item?.aiScore ?? 0) * 30;
+    return Math.max(8, Math.min(100, Math.round(blockedWeight + scoreWeight)));
+  }
+
+  getSeverityClass(item?: BottleneckSummary): string {
+    const severity = item?.severity ?? 'Low';
+    if (severity === 'High') return 'high';
+    if (severity === 'Medium') return 'medium';
+    return 'low';
   }
 
   getWorkloadLabel(value?: string | null): string {
@@ -179,10 +223,10 @@ export class Dashboard implements OnInit {
     this.workloadItems = workload;
 
     this.stats = [
-      { label: 'Tổng công việc', value: summary.tongCongViec || tasks.length, description: 'Tổng số task theo dashboard API' },
+      { label: 'Tổng công việc', value: summary.tongCongViec || tasks.length, description: 'Click để mở danh sách task', target: 'tasks' },
       {
         label: 'Task nguy cơ trễ hạn',
-        value: this.getSummaryNumber(summary.taskNguyCoTreHan, lateAlerts.length),
+        value: lateAlerts.length,
         type: 'warning',
         description: 'Click để xem radar cảnh báo',
         target: 'late-risk',
@@ -197,28 +241,41 @@ export class Dashboard implements OnInit {
     ];
 
     this.applyCharts(summary, tasks);
-    this.highRiskTasks = lateAlerts.slice(0, 5).map((item) => ({
-      id: item.maCongViec,
-      name: item.tenCongViec,
-      riskScore: Math.round(item.riskPercent ?? 0),
-      deadline: item.hanChot || 'Chưa có hạn chót',
-      assignee: item.nguoiPhuTrach || 'Chưa phân công',
-      reason: item.nguyenNhan || 'Backend chưa trả nguyên nhân chi tiết.',
-    }));
+    this.highRiskTasks = this.mapLateRiskAlertsForDashboard(lateAlerts);
 
-    this.topBottlenecks = bottleneckResults.slice(0, 5).map((item) => ({
-      id: item.maDiemNghen,
-      name: item.maCongViec ? `Task #${item.maCongViec}` : item.khuVucPhatHien,
-      blockedTasks: this.getBottleneckImpact(item),
-      severity: this.normalizeSeverity(item.mucDoNghiemTrong),
-      reason: item.nguyenNhan || item.khuVucPhatHien,
-    }));
+    this.topBottlenecks = bottleneckResults
+      .map((item) => ({
+        id: item.maDiemNghen,
+        taskId: item.maCongViec,
+        name: item.tenCongViec || (item.maCongViec ? `Task #${item.maCongViec}` : item.khuVucPhatHien),
+        blockedTasks: this.getBottleneckImpact(item),
+        severity: this.normalizeSeverity(item.mucDoNghiemTrong),
+        reason: item.nguyenNhan || item.giaiThich || item.khuVucPhatHien || 'API AI chưa trả giải thích chi tiết cho điểm nghẽn này.',
+        aiScore: this.normalizeBottleneckScore(item.bottleneckScore),
+        recommendation: item.khuyenNghiAI,
+      }))
+      .sort((a, b) => b.blockedTasks - a.blockedTasks || b.aiScore - a.aiScore)
+      .slice(0, 5);
 
     this.bottleneckSourceMessage = bottleneckResults.length
       ? 'Dữ liệu lấy từ API AI phân tích điểm nghẽn.'
       : 'Chưa có dữ liệu GNN từ API AI.';
 
     this.cdr.detectChanges();
+  }
+
+  private mapLateRiskAlertsForDashboard(lateAlerts: DashboardTaskAlert[]): HighRiskTask[] {
+    return lateAlerts
+      .map((item) => ({
+        id: item.maCongViec,
+        name: item.tenCongViec || `Task #${item.maCongViec}`,
+        riskScore: Math.round(item.riskPercent ?? 0),
+        deadline: item.hanChot || 'Chưa có hạn chót',
+        assignee: item.nguoiPhuTrach || 'Chưa phân công',
+        reason: item.nguyenNhan || `Nguy cơ trễ hạn ${Math.round(item.riskPercent ?? 0)}% - ${item.riskLevel || 'AI cảnh báo'}.`,
+      }))
+      .sort((a, b) => b.riskScore - a.riskScore || a.id - b.id)
+      .slice(0, 6);
   }
 
   private applyCharts(summary: DashboardSummary, tasks: Task[]): void {
@@ -263,6 +320,12 @@ export class Dashboard implements OnInit {
   private parseBlockedTaskCount(reason?: string | null): number | null {
     const match = reason?.match(/(\d+)\s*task/i);
     return match ? Number(match[1]) : null;
+  }
+
+  private normalizeBottleneckScore(value?: number | null): number {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return numericValue > 1 ? Math.min(numericValue / 100, 1) : Math.max(numericValue, 0);
   }
 
   private normalizeSeverity(value: string): 'High' | 'Medium' | 'Low' {
@@ -342,7 +405,7 @@ export class Dashboard implements OnInit {
 
   private buildEmptyStats(): DashboardStat[] {
     return [
-      { label: 'Tổng công việc', value: 0, description: 'Tổng số task theo dashboard API' },
+      { label: 'Tổng công việc', value: 0, description: 'Click để mở danh sách task', target: 'tasks' },
       { label: 'Task nguy cơ trễ hạn', value: 0, type: 'warning', description: 'Click để xem radar cảnh báo', target: 'late-risk' },
       { label: 'Điểm nghẽn', value: 0, type: 'danger', description: 'Click để xem cảnh báo GNN', target: 'bottleneck' },
     ];
