@@ -158,10 +158,14 @@ export class AssignmentCompare implements OnInit {
     this.dataWarning = '';
     const totalNewHours = this.newTaskCount * this.hoursPerTask;
 
-    this.developerLoads = developers.map((user, index) => {
+    this.developerLoads = developers.map((user) => {
       const assignedTasks = projectTasks.filter((task) => task.assigneeId === user.id || task.assignee === user.hoTen);
-      const rawHours = assignedTasks.reduce((sum, task) => sum + (task.estimatedHours ?? this.hoursPerTask), 0);
-      const currentHours = this.normalizeSprintHours(rawHours, assignedTasks.length, index);
+      // Dùng trực tiếp tổng giờ ước tính từ backend, không normalize giả tạo
+      const currentHours = this.clamp(
+        assignedTasks.reduce((sum, task) => sum + (task.estimatedHours ?? this.hoursPerTask), 0),
+        0,
+        this.sprintMaxHours * 2
+      );
       const currentRisk = assignedTasks.length
         ? Math.round(assignedTasks.reduce((sum, task) => sum + task.riskScore, 0) / assignedTasks.length)
         : this.getBaseRiskByLoad(currentHours);
@@ -425,13 +429,9 @@ export class AssignmentCompare implements OnInit {
     return normalized.includes('lập trình') || normalized.includes('lap trinh') || normalized.includes('developer');
   }
 
-  private normalizeSprintHours(rawHours: number, taskCount: number, index: number): number {
-    if (rawHours >= this.sprintMinHours && rawHours <= this.sprintMaxHours) return Math.round(rawHours);
-
-    const baseline = this.sprintMinHours + ((index * 7 + taskCount * 5) % 25);
-    const taskAdjustment = Math.min(8, Math.round(taskCount * 1.2));
-    return this.clamp(baseline + taskAdjustment, this.sprintMinHours, this.sprintMaxHours);
-  }
+  // normalizeSprintHours đã bị xóa: hàm cũ bỏ qua dữ liệu giờ thực từ backend khi
+  // rawHours nằm ngoài [sprintMinHours, sprintMaxHours], thay bằng giá trị giả dựa vào index.
+  // Nay developerLoads dùng trực tiếp tổng soGioUocTinh từ backend.
 
   private calculateTraditionalRisk(totalNewHours: number): number {
     const maxLoad = Math.max(0, ...this.traditionalWorkloads.map((developer) => developer.projectedHours));

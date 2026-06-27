@@ -45,6 +45,12 @@ export class AiService {
     return request$;
   }
 
+  /** Xóa cache suggest-assignees cho task cụ thể.
+   *  Gọi sau khi giao việc để lần fetch tiếp theo lấy diemKhoiLuong mới từ backend. */
+  clearSuggestAssigneesCache(taskId: number): void {
+    this.suggestAssigneesCache.delete(taskId);
+  }
+
   matchStaff(taskId: number, userId: number): Observable<StaffMatchResult> {
     return this.http.post<StaffMatchResult>(
       `${this.apiUrl}/tasks/${taskId}/match-staff/${userId}`,
