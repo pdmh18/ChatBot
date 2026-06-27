@@ -236,7 +236,6 @@
       <div class="panel-heading">
         <div>
           <h3>AI đề xuất giao task</h3>
-          <p>Dữ liệu lấy trực tiếp từ API AI: POST /api/ai/tasks/&lt;id&gt;/suggest-assignees.</p>
         </div>
         <button class="secondary-action explain-ai-button" type="button" (click)="openExplanation()" [disabled]="!aiAssignments.length" aria-label="Mở giải thích quyết định AI từ API">
           <span class="explain-icon">i</span>
@@ -297,9 +296,7 @@
           }
         </div>
 
-        <div class="modal-note">
-          Phần này hiển thị dữ liệu đề xuất giao việc lấy từ API AI. Frontend chỉ trình bày lại điểm phù hợp, workload, kỹ năng, kinh nghiệm và lý do do backend/AI trả về.
-        </div>
+       
       </article>
     </div>
   }
