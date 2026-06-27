@@ -1,4 +1,4 @@
-﻿<h2>Tasks</h2>
+<h2>Tasks</h2>
 
 @if (successMessage) {
   <div class="success-message">{{ successMessage }}</div>
@@ -13,16 +13,17 @@
     type="text"
     placeholder="Tìm task..."
     [(ngModel)]="searchText"
+    (ngModelChange)="onTaskFiltersChanged()"
   />
 
-  <select [(ngModel)]="statusFilter">
+  <select [(ngModel)]="statusFilter" (ngModelChange)="onTaskFiltersChanged()">
     <option value="All">Tất cả trạng thái</option>
     @for (status of statuses; track status.id) {
       <option [value]="status.name">{{ getStatusLabel(status.name) }}</option>
     }
   </select>
 
-  <select [(ngModel)]="priorityFilter">
+  <select [(ngModel)]="priorityFilter" (ngModelChange)="onTaskFiltersChanged()">
     <option value="All">Tất cả ưu tiên</option>
     @for (priority of priorities; track priority.id) {
       <option [value]="priority.name">{{ getPriorityLabel(priority.name) }}</option>
@@ -33,6 +34,22 @@
     + Thêm task
   </button>
 </div>
+
+@if (filteredTasks.length) {
+  <div class="task-list-summary">
+    <span>
+      Đang hiển thị
+      <strong>{{ visibleTasks.length }}</strong>
+      / {{ filteredTasks.length }} task
+    </span>
+
+    @if (hasHiddenTasks) {
+      <button type="button" class="show-all-btn" (click)="toggleTaskVisibility()">
+        {{ showAllTasks ? (isRenderingAllTasks ? 'Đang tải thêm...' : 'Thu gọn còn 100 task') : 'Hiện tất cả ' + filteredTasks.length + ' task' }}
+      </button>
+    }
+  </div>
+}
 
 <div class="table-card">
   <table class="task-table">
@@ -52,7 +69,7 @@
     </thead>
 
     <tbody>
-      @for (task of filteredTasks; track task.id) {
+      @for (task of visibleTasks; track task.id) {
         <tr>
           <td class="task-name">{{ task.name }}</td>
           <td>{{ task.project }}</td>
@@ -178,27 +195,39 @@
 
         @for (developer of suggestedDevelopers; track developer.id) {
           <div class="developer-card">
-            <div>
-              <strong>{{ developer.name }}</strong>
-              @if (developer.model) {
-                <small>{{ developer.model }}</small>
-              }
-              <p>{{ developer.reason }}</p>
+            <div class="developer-main">
+              <div class="developer-title">
+                <strong>{{ developer.name }}</strong>
+                @if (developer.model) {
+                  <span class="model-badge">{{ developer.model }}</span>
+                }
+              </div>
+
+              <p class="developer-reason">
+                <span>Lý do AI:</span>
+                {{ developer.reason }}
+              </p>
             </div>
 
             <div class="developer-score">
-              <span>{{ developer.score }}%</span>
-              <small>Tải hiện tại {{ developer.workload }}%</small>
-              @if (developer.skillScore !== undefined && developer.skillScore !== null) {
-                <small>Kỹ năng {{ developer.skillScore }}</small>
-              }
-              @if (developer.experienceScore !== undefined && developer.experienceScore !== null) {
-                <small>Kinh nghiệm {{ developer.experienceScore }}</small>
-              }
+              <div class="score-main">
+                <span>{{ developer.score }}%</span>
+                <small>Điểm phù hợp AI</small>
+              </div>
+
+              <div class="score-metrics">
+                <small>Mức độ còn rảnh: {{ developer.workload }}%</small>
+                @if (developer.skillScore !== undefined && developer.skillScore !== null) {
+                  <small>Kỹ năng: {{ developer.skillScore }}</small>
+                }
+                @if (developer.experienceScore !== undefined && developer.experienceScore !== null) {
+                  <small>Kinh nghiệm: {{ developer.experienceScore }}</small>
+                }
+              </div>
             </div>
 
             <button type="button" [disabled]="isSuggestionLoading" (click)="assignDeveloper(developer)">
-              Chọn
+              {{ isSuggestionLoading ? 'Đang xử lý' : 'Chọn' }}
             </button>
           </div>
         }
@@ -210,7 +239,12 @@
             </strong>
             <p>Xác suất: {{ getRiskPercent(riskResult) }}%</p>
             <p>Mức độ: {{ riskResult.mucDoRuiRo }}</p>
-            <small>{{ riskResult.khuyenNghi || riskResult.tacDongDuBao }}</small>
+            @if (riskResult.tacDongDuBao) {
+              <small><b>Nguyên nhân:</b> {{ riskResult.tacDongDuBao }}</small>
+            }
+            @if (riskResult.khuyenNghi) {
+              <small><b>Khuyến nghị:</b> {{ riskResult.khuyenNghi }}</small>
+            }
           </div>
         }
       </div>
@@ -323,5 +357,9 @@
     </div>
   </div>
 }
+
+
+
+
 
 

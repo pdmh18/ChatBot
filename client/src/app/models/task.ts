@@ -24,6 +24,11 @@ export interface Task {
   progress?: number | null;
   riskScore: number;
   riskLevel?: string | null;
+  blockedTasks?: number | null;
+  overloadPercent?: number | null;
+  dependencyBlockedCount?: number | null;
+  aiReason?: string | null;
+  featureImportance?: string[] | null;
 }
 
 export interface TaskQueryParams {
@@ -55,6 +60,15 @@ export interface TaskListItem {
   tienDo?: number | null;
   riskPercent: number;
   riskLevel: string;
+  blockedTasks?: number | null;
+  soTaskBiChan?: number | null;
+  soTaskDangChan?: number | null;
+  soTaskPhuThuoc?: number | null;
+  overloadPercent?: number | null;
+  dependencyBlockedCount?: number | null;
+  aiReason?: string | null;
+  nguyenNhanAI?: string | null;
+  featureImportance?: string[] | string | null;
 }
 
 export interface TaskDetail extends TaskListItem {

@@ -1,7 +1,7 @@
-﻿import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Observable, of } from 'rxjs';
-import { catchError, timeout } from 'rxjs/operators';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError, switchMap, timeout } from 'rxjs/operators';
 import { RiskPredictionResult, StaffMatchResult } from '../../models/ai';
 import { LookupItemDto, SprintLookupDto, UserLookupDto } from '../../models/lookups.model';
 import {
@@ -35,6 +35,14 @@ interface DeveloperSuggestion {
 })
 export class Tasks implements OnInit {
   tasks: Task[] = [];
+  filteredTasks: Task[] = [];
+  visibleTasks: Task[] = [];
+  readonly defaultVisibleTaskCount = 100;
+  private readonly renderBatchSize = 200;
+  private renderTaskLimit = this.defaultVisibleTaskCount;
+  private renderGeneration = 0;
+  showAllTasks = false;
+  isRenderingAllTasks = false;
   selectedTask: Task | null = null;
   suggestionTask: Task | null = null;
 
@@ -83,23 +91,82 @@ export class Tasks implements OnInit {
     this.loadTasks();
   }
 
-  get filteredTasks(): Task[] {
-    return this.tasks.filter((task) => {
-      const matchesSearch = (task.name?.toLowerCase() ?? '').includes(
-        this.searchText.toLowerCase()
-      );
+  get hasHiddenTasks(): boolean {
+    return this.filteredTasks.length > this.defaultVisibleTaskCount;
+  }
+
+  get hiddenTaskCount(): number {
+    return Math.max(this.filteredTasks.length - this.visibleTasks.length, 0);
+  }
+
+  onTaskFiltersChanged(): void {
+    this.showAllTasks = false;
+    this.applyTaskFilters();
+  }
+
+  toggleTaskVisibility(): void {
+    this.showAllTasks = !this.showAllTasks;
+    this.renderTaskLimit = this.showAllTasks
+      ? Math.min(this.renderBatchSize, this.filteredTasks.length)
+      : this.defaultVisibleTaskCount;
+    this.updateVisibleTasks();
+
+    if (this.showAllTasks) {
+      this.scheduleRenderMoreTasks();
+    }
+  }
+
+  private applyTaskFilters(): void {
+    const keyword = this.searchText.trim().toLowerCase();
+
+    this.filteredTasks = this.tasks.filter((task) => {
+      const matchesSearch = !keyword || (task.name?.toLowerCase() ?? '').includes(keyword);
       const matchesStatus = this.statusFilter === 'All' || task.status === this.statusFilter;
       const matchesPriority = this.priorityFilter === 'All' || task.priority === this.priorityFilter;
       return matchesSearch && matchesStatus && matchesPriority;
     });
+
+    this.renderTaskLimit = this.showAllTasks
+      ? Math.min(this.renderBatchSize, this.filteredTasks.length)
+      : this.defaultVisibleTaskCount;
+    this.updateVisibleTasks();
+  }
+
+  private updateVisibleTasks(): void {
+    this.renderGeneration += 1;
+    const limit = this.showAllTasks ? this.renderTaskLimit : this.defaultVisibleTaskCount;
+    this.visibleTasks = this.filteredTasks.slice(0, limit);
+    this.isRenderingAllTasks = this.showAllTasks && this.visibleTasks.length < this.filteredTasks.length;
+  }
+
+  private scheduleRenderMoreTasks(): void {
+    const generation = this.renderGeneration;
+
+    window.setTimeout(() => {
+      if (!this.showAllTasks || generation !== this.renderGeneration) return;
+
+      this.renderTaskLimit = Math.min(
+        this.renderTaskLimit + this.renderBatchSize,
+        this.filteredTasks.length
+      );
+      this.visibleTasks = this.filteredTasks.slice(0, this.renderTaskLimit);
+      this.isRenderingAllTasks = this.visibleTasks.length < this.filteredTasks.length;
+      this.cdr.detectChanges();
+
+      if (this.isRenderingAllTasks) {
+        this.scheduleRenderMoreTasks();
+      }
+    }, 0);
   }
 
   loadTasks(): void {
     this.taskDataMessage = 'Đang tải danh sách task từ backend...';
 
-    this.taskService.getTaskViews({ pageNumber: 1, pageSize: 100 }).subscribe({
+    this.taskService.getTaskViews({ pageNumber: 1, pageSize: 1000 }).subscribe({
       next: (tasks) => {
         this.tasks = tasks;
+        this.showAllTasks = false;
+        this.applyTaskFilters();
         this.taskDataMessage = tasks.length
           ? ''
           : 'Backend chưa có task nào. Bấm + Thêm task để tạo task đầu tiên.';
@@ -107,6 +174,7 @@ export class Tasks implements OnInit {
       },
       error: () => {
         this.tasks = [];
+        this.applyTaskFilters();
         this.taskDataMessage = 'Chưa tải được API danh sách task. Kiểm tra backend có đang chạy ở port 49261 không.';
         this.cdr.detectChanges();
       },
@@ -178,6 +246,9 @@ export class Tasks implements OnInit {
     return getTaskPriorityLabel(value);
   }
 
+  formatSuggestionReason(reason: string): string {
+    return reason || 'AI chưa trả lý do chi tiết.';
+  }
   onProjectChange(projectName: string): void {
     const selectedProject = this.projects.find((project) => project.name === projectName);
 
@@ -185,7 +256,9 @@ export class Tasks implements OnInit {
       ? this.sprints.filter((sprint) => sprint.maDuAn === selectedProject.id)
       : this.sprints;
 
-    this.newTask.sprint = this.filteredSprintsForForm[0]?.tenSprint ?? '';
+    this.newTask.projectId = selectedProject?.id ?? null;
+    this.newTask.sprintId = null;
+    this.newTask.sprint = '';
   }
 
   selectTask(task: Task): void {
@@ -227,8 +300,7 @@ export class Tasks implements OnInit {
       error: (error) => {
         this.suggestedDevelopers = this.buildDeveloperSuggestions();
         this.aiSuggestionMessage =
-          error?.error?.message ||
-          'Chưa gọi được API AI đề xuất nhân sự. Đang hiển thị gợi ý tạm từ dữ liệu người dùng.';
+          'AI server chưa xử lý được yêu cầu này. Đang hiển thị gợi ý dự phòng từ dữ liệu người dùng.';
         this.isSuggestionLoading = false;
         this.cdr.detectChanges();
       },
@@ -246,24 +318,52 @@ export class Tasks implements OnInit {
   assignDeveloper(developer: DeveloperSuggestion): void {
     if (!this.suggestionTask) return;
 
+    const taskId = this.suggestionTask.id;
+    const taskName = this.suggestionTask.name;
+
     this.aiSuggestionMessage = `Đang gán task cho ${developer.name}...`;
     this.isSuggestionLoading = true;
+    this.cdr.detectChanges();
 
-    this.taskService.assignTask(this.suggestionTask.id, { maNguoiPhuTrach: developer.id }).subscribe({
-      next: () => {
-        this.successMessage = `Đã gán task "${this.suggestionTask?.name}" cho ${developer.name}.`;
-        this.predictRiskForSuggestion(this.suggestionTask!.id);
-      },
-      error: () => {
-        this.aiSuggestionMessage = 'Chưa phân công được task. Kiểm tra backend rồi thử lại.';
-        this.isSuggestionLoading = false;
-        this.cdr.detectChanges();
-      },
-    });
+    this.taskService
+      .assignTask(taskId, { maNguoiPhuTrach: developer.id })
+      .pipe(
+        switchMap(() =>
+          forkJoin({
+            suggestions: this.aiService
+              .suggestAssignees(taskId)
+              .pipe(catchError(() => of([] as StaffMatchResult[]))),
+            risk: this.aiService
+              .predictRisk(taskId)
+              .pipe(catchError(() => of(null as RiskPredictionResult | null))),
+          })
+        )
+      )
+      .subscribe({
+        next: ({ suggestions, risk }) => {
+          this.successMessage = `Đã gán task "${taskName}" cho ${developer.name}.`;
+          this.suggestedDevelopers = suggestions.length
+            ? suggestions.map((item) => this.mapStaffMatchToSuggestion(item))
+            : this.suggestedDevelopers;
+          this.riskResult = risk;
+          this.aiSuggestionMessage = suggestions.length
+            ? ''
+            : 'Đã gán task. Chưa tải lại được gợi ý AI mới, đang giữ danh sách hiện tại.';
+          this.isSuggestionLoading = false;
+          this.loadTasks();
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.aiSuggestionMessage = 'Chưa phân công được task. Kiểm tra backend rồi thử lại.';
+          this.isSuggestionLoading = false;
+          this.cdr.detectChanges();
+        },
+      });
   }
 
   openAddTask(): void {
     this.formMessage = '';
+    this.newTask = this.createEmptyTask();
     this.isAddTaskOpen = true;
   }
 
@@ -436,7 +536,7 @@ export class Tasks implements OnInit {
       skillScore: item.diemKyNang ?? null,
       experienceScore: item.diemKinhNghiem ?? null,
       model: item.tenMoHinh,
-      reason: item.lyDo || 'AI đề xuất dựa trên kỹ năng, tải công việc và kinh nghiệm lịch sử.',
+      reason: this.formatSuggestionReason(item.lyDo || 'AI đề xuất dựa trên kỹ năng, mức độ còn rảnh và kinh nghiệm lịch sử.'),
     };
   }
 
@@ -453,6 +553,12 @@ export class Tasks implements OnInit {
     return new Date().toISOString().slice(0, 10);
   }
 }
+
+
+
+
+
+
 
 
 

@@ -19,55 +19,6 @@ export class AiService {
 
   constructor(private http: HttpClient) {}
 
-  getLateRisks(): LateRisk[] {
-    return [
-      {
-        id: 1,
-        task: 'Thiết kế database',
-        risk: 82,
-        reason: 'Deadline gần, độ ưu tiên cao.',
-      },
-      {
-        id: 2,
-        task: 'Màn hình Kanban',
-        risk: 68,
-        reason: 'Khối lượng công việc lớn.',
-      },
-    ];
-  }
-
-  getBottlenecks(): Bottleneck[] {
-    return [
-      {
-        id: 1,
-        task: 'Database Schema',
-        blockedTasks: 5,
-      },
-      {
-        id: 2,
-        task: 'API Authentication',
-        blockedTasks: 3,
-      },
-    ];
-  }
-
-  getAssigneeSuggestions(): AssigneeSuggestion[] {
-    return [
-      {
-        id: 1,
-        task: 'API đăng nhập',
-        developer: 'Bình',
-        score: 91,
-      },
-      {
-        id: 2,
-        task: 'Kanban UI',
-        developer: 'Oanh',
-        score: 88,
-      },
-    ];
-  }
-
   getLateRisksApi(): Observable<LateRisk[]> {
     return this.http.get<LateRisk[]>(`${this.apiUrl}/late-risk`);
   }
@@ -113,6 +64,3 @@ export class AiService {
       .pipe(map((response) => (Array.isArray(response) ? response : response.value ?? [])));
   }
 }
-
-
-

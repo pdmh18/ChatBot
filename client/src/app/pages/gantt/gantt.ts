@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectorRef, Component } from '@angular/core';
+﻿import { AfterViewInit, ChangeDetectorRef, Component } from '@angular/core';
 import FrappeGantt from 'frappe-gantt';
 import { Task } from '../../models/task';
 import { TaskService } from '../../services/task';
