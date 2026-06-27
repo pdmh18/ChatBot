@@ -1,8 +1,8 @@
 .layout {
   display: flex;
   min-height: 100vh;
-  background: #f4f6f8;
-  font-family: Arial, sans-serif;
+  background: var(--page-bg);
+  font-family: var(--app-font);
 }
 
 .sidebar {

@@ -1,6 +1,6 @@
-﻿import { Injectable } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, map, shareReplay } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { DashboardSummary, DashboardTaskAlert, DashboardWorkload } from '../models/dashboard';
 
@@ -14,6 +14,7 @@ interface ApiValueResponse<T> {
 })
 export class DashboardService {
   private readonly apiUrl = `${environment.apiUrl}/dashboard`;
+  private readonly alertsCache = new Map<string, Observable<DashboardTaskAlert[]>>();
 
   constructor(private http: HttpClient) {}
 
@@ -34,11 +35,21 @@ export class DashboardService {
   }
 
   getAlerts(type: 'late-risk' | 'bottleneck', projectId?: number, sprintId?: number): Observable<DashboardTaskAlert[]> {
-    return this.http
+    const cacheKey = `${type}:${projectId ?? 'all'}:${sprintId ?? 'all'}`;
+    const cached = this.alertsCache.get(cacheKey);
+    if (cached) return cached;
+
+    const request$ = this.http
       .get<DashboardTaskAlert[] | ApiValueResponse<DashboardTaskAlert[]>>(`${this.apiUrl}/alerts`, {
         params: this.buildParams({ projectId, sprintId, type }),
       })
-      .pipe(map((response) => this.unwrapList(response)));
+      .pipe(
+        map((response) => this.unwrapList(response)),
+        shareReplay({ bufferSize: 1, refCount: false })
+      );
+
+    this.alertsCache.set(cacheKey, request$);
+    return request$;
   }
 
   private unwrapValue<T>(response: T | ApiValueResponse<T>): T {

@@ -4,15 +4,15 @@
   align-items: center;
   justify-content: center;
   background: #f4f6f8;
-  font-family: Arial, sans-serif;
+  font-family: var(--app-font);
 }
 
 .login-card {
   width: 360px;
   padding: 28px;
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
 
 .login-card h2 {
@@ -53,3 +53,11 @@
 .login-card button:hover {
   background: #1d4ed8;
 }
+/* Login polish */
+.login-card, .card, form {
+  border-radius: 22px !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md);
+}
+button, input { font-family: var(--app-font) !important; border-radius: 12px !important; }
+button { font-weight: 800 !important; }

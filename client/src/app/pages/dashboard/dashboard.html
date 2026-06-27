@@ -1,7 +1,7 @@
-﻿<div class="dashboard-header">
+<div class="dashboard-header">
   <div>
-    <h2>Dashboard</h2>
-    <p>PM theo dõi nhanh rủi ro, điểm nghẽn và chuyển thẳng sang màn xử lý.</p>
+    <h2>Dashboard quản lý AI</h2>
+    <p>PM theo dõi rủi ro, điểm nghẽn GNN và tối ưu nguồn lực theo dữ liệu API.</p>
   </div>
 
   <button type="button" class="optimize-btn" (click)="runResourceOptimization()">
@@ -53,11 +53,10 @@
   </div>
 </div>
 
-
-<div class="insights">
+<div class="insights manager-insights">
   <section class="insight-card">
     <div class="section-title">
-      <h3>Task rủi ro cao</h3>
+      <h3>Task nguy cơ trễ hạn</h3>
       <button type="button" (click)="openHighRiskDetails()">Xem radar</button>
     </div>
 
@@ -72,39 +71,180 @@
         <span class="risk-badge">{{ task.riskScore }}%</span>
       </button>
     } @empty {
-      <div class="empty-insight">Chưa có task rủi ro cao từ API cảnh báo.</div>
+      <div class="empty-insight">Chưa có task nguy cơ trễ hạn từ API cảnh báo.</div>
     }
   </section>
 
-  <section class="insight-card">
-    <div class="section-title stacked-title">
+  <section class="insight-card gnn-manager-card">
+    <div class="gnn-header">
       <div>
-        <h3>Top điểm nghẽn GNN</h3>
+        <span class="ai-eyebrow">🧠 GNN Dependency Intelligence</span>
+        <h3>Bản đồ điểm nghẽn dự án</h3>
         @if (bottleneckSourceMessage) {
           <small class="source-note">{{ bottleneckSourceMessage }}</small>
         }
       </div>
-      <button type="button" (click)="openBottleneckDetails()">Xem chi tiết</button>
+      <button type="button" class="primary-graph-btn" (click)="openBottleneckDetails()">Mở bản đồ lớn</button>
     </div>
 
-    @for (item of topBottlenecks; track item.id) {
-      <button type="button" class="insight-row action-row bottleneck-row" (click)="openBottleneckDetails()">
-        <div>
-          <strong>{{ item.name }}</strong>
-          <p>
-            Đang chặn
-            <span class="blocked-count">{{ item.blockedTasks }}</span>
-            task khác
-          </p>
-          <small>{{ item.reason }}</small>
+    <div class="gnn-legend">
+      <span><i class="legend-dot bottleneck"></i>Task nghẽn chính</span>
+      <span><i class="legend-dot affected"></i>Task bị ảnh hưởng</span>
+      <span><i class="legend-line"></i>Quan hệ phụ thuộc</span>
+    </div>
+
+    @if (topBottlenecks.length) {
+      <button type="button" class="manager-graph" (click)="openBottleneckDetails(topBottlenecks[0])" aria-label="Mở bản đồ GNN chi tiết">
+        <div class="graph-kpis">
+          <div>
+            <span>Điểm nghẽn chính</span>
+            <strong>{{ topBottlenecks[0].name }}</strong>
+          </div>
+          <div>
+            <span>AI score</span>
+            <strong>{{ getAiScorePercent(topBottlenecks[0]) }}%</strong>
+          </div>
+          <div>
+            <span>Task bị ảnh hưởng</span>
+            <strong>{{ topBottlenecks[0].blockedTasks }}</strong>
+          </div>
         </div>
 
-        <span class="severity-badge">{{ item.severity }}</span>
+        <svg viewBox="0 0 780 310" role="img" aria-label="GNN bottleneck management map">
+          <defs>
+            <marker id="managerArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+          </defs>
+
+          <line x1="390" y1="155" x2="610" y2="75"></line>
+          <line x1="390" y1="155" x2="640" y2="155"></line>
+          <line x1="390" y1="155" x2="610" y2="235"></line>
+          <line class="input-edge" x1="165" y1="155" x2="305" y2="155"></line>
+
+          <rect class="context-node" x="42" y="105" width="125" height="100" rx="22"></rect>
+          <text class="node-title" x="104" y="145" text-anchor="middle">Dữ liệu API</text>
+          <text class="node-sub" x="104" y="170" text-anchor="middle">task + phụ thuộc</text>
+
+          <circle class="bottleneck-node" cx="350" cy="155" r="64"></circle>
+          <text class="node-title" x="350" y="145" text-anchor="middle">{{ getGraphTaskLabel(topBottlenecks[0]) }}</text>
+          <text class="node-sub" x="350" y="170" text-anchor="middle">critical node</text>
+
+          <rect class="affected-node" x="590" y="35" width="148" height="78" rx="20"></rect>
+          <text class="node-title" x="664" y="67" text-anchor="middle">{{ topBottlenecks[0].blockedTasks }}</text>
+          <text class="node-sub" x="664" y="90" text-anchor="middle">task bị ảnh hưởng</text>
+
+          <rect class="risk-node" x="608" y="118" width="148" height="78" rx="20"></rect>
+          <text class="node-title" x="682" y="150" text-anchor="middle">{{ topBottlenecks[0].severity }}</text>
+          <text class="node-sub" x="682" y="173" text-anchor="middle">mức cảnh báo</text>
+
+          <rect class="score-node" x="590" y="200" width="148" height="78" rx="20"></rect>
+          <text class="node-title" x="664" y="232" text-anchor="middle">{{ getAiScorePercent(topBottlenecks[0]) }}%</text>
+          <text class="node-sub" x="664" y="255" text-anchor="middle">AI confidence</text>
+        </svg>
       </button>
-    } @empty {
-      <div class="empty-insight">Chưa có dữ liệu GNN về điểm nghẽn.</div>
+
+      <div class="gnn-list-title">
+        <strong>Top điểm nghẽn cần xử lý</strong>
+        <span>Sắp xếp theo tác động từ API AI</span>
+      </div>
+
+      @for (item of topBottlenecks; track item.id) {
+        <button type="button" class="gnn-impact-row" (click)="openBottleneckDetails(item)">
+          <div class="impact-main">
+            <div class="impact-title">
+              <strong>{{ item.name }}</strong>
+              <span [class]="'severity-chip ' + getSeverityClass(item)">{{ item.severity }}</span>
+            </div>
+            <p>{{ item.reason }}</p>
+            <div class="impact-meter" aria-label="Mức ảnh hưởng điểm nghẽn">
+              <span [style.width.%]="getImpactBarWidth(item)"></span>
+            </div>
+          </div>
+
+          <div class="impact-numbers">
+            <strong>{{ item.blockedTasks }}</strong>
+            <span>task bị ảnh hưởng</span>
+            <em>AI {{ getAiScorePercent(item) }}%</em>
+          </div>
+        </button>
+      }
+    } @else {
+      <div class="empty-insight">Chưa có dữ liệu GNN về điểm nghẽn từ API AI.</div>
     }
   </section>
 </div>
 
+@if (graphModalOpen && selectedBottleneck) {
+  <div class="modal-backdrop" (click)="closeGraphModal()">
+    <section class="graph-modal manager-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div>
+          <span class="ai-eyebrow">GNN Dependency Graph</span>
+          <h3>{{ selectedBottleneck.name }} đang là điểm nghẽn cần ưu tiên</h3>
+        </div>
+        <button type="button" class="modal-close" (click)="closeGraphModal()">×</button>
+      </div>
 
+      <div class="modal-body manager-modal-body">
+        <div class="network-canvas manager-network">
+          <svg viewBox="0 0 920 430" role="img" aria-label="GNN network graph detail">
+            <defs>
+              <marker id="detailArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z"></path>
+              </marker>
+            </defs>
+
+            <line class="input-edge" x1="170" y1="215" x2="335" y2="215"></line>
+            <line x1="462" y1="215" x2="665" y2="95"></line>
+            <line x1="462" y1="215" x2="690" y2="215"></line>
+            <line x1="462" y1="215" x2="665" y2="335"></line>
+
+            <rect class="context-node" x="40" y="160" width="145" height="110" rx="24"></rect>
+            <text class="node-title" x="112" y="200" text-anchor="middle">API AI</text>
+            <text class="node-sub" x="112" y="228" text-anchor="middle">BottleneckResult</text>
+
+            <circle class="bottleneck-node" cx="400" cy="215" r="78"></circle>
+            <text class="node-title" x="400" y="203" text-anchor="middle">{{ getGraphTaskLabel(selectedBottleneck) }}</text>
+            <text class="node-sub" x="400" y="232" text-anchor="middle">critical bottleneck</text>
+
+            <rect class="affected-node" x="645" y="50" width="205" height="92" rx="24"></rect>
+            <text class="node-title" x="748" y="88" text-anchor="middle">{{ selectedBottleneck.blockedTasks }}</text>
+            <text class="node-sub" x="748" y="116" text-anchor="middle">task phía sau bị ảnh hưởng</text>
+
+            <rect class="risk-node" x="680" y="169" width="205" height="92" rx="24"></rect>
+            <text class="node-title" x="782" y="207" text-anchor="middle">{{ selectedBottleneck.severity }}</text>
+            <text class="node-sub" x="782" y="235" text-anchor="middle">mức độ nghiêm trọng</text>
+
+            <rect class="score-node" x="645" y="288" width="205" height="92" rx="24"></rect>
+            <text class="node-title" x="748" y="326" text-anchor="middle">{{ getAiScorePercent(selectedBottleneck) }}%</text>
+            <text class="node-sub" x="748" y="354" text-anchor="middle">AI bottleneck score</text>
+          </svg>
+        </div>
+
+        <aside class="graph-metrics manager-metrics">
+          <div>
+            <span>Task / vùng phát hiện</span>
+            <strong>{{ selectedBottleneck.name }}</strong>
+          </div>
+          <div>
+            <span>AI Bottleneck Score</span>
+            <strong>{{ getAiScorePercent(selectedBottleneck) }}%</strong>
+          </div>
+          <div>
+            <span>Số task bị ảnh hưởng phía sau</span>
+            <strong>{{ selectedBottleneck.blockedTasks }}</strong>
+          </div>
+          <div>
+            <span>Mức cảnh báo</span>
+            <strong>{{ selectedBottleneck.severity }}</strong>
+          </div>
+          <p>{{ selectedBottleneck.reason }}</p>
+          @if (selectedBottleneck.recommendation) {
+            <p class="recommendation">Gợi ý AI: {{ selectedBottleneck.recommendation }}</p>
+          }
+        </aside>
+      </div>
+    </section>
+  </div>
+}

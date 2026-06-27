@@ -1,5 +1,6 @@
 ﻿import { AfterViewInit, ChangeDetectorRef, Component } from '@angular/core';
 import FrappeGantt from 'frappe-gantt';
+import { catchError, of, timeout } from 'rxjs';
 import { Task } from '../../models/task';
 import { TaskService } from '../../services/task';
 
@@ -18,13 +19,36 @@ export class Gantt implements AfterViewInit {
   ) {}
 
   ngAfterViewInit(): void {
-    this.taskService.getTaskViews({ pageNumber: 1, pageSize: 100 }).subscribe({
-      next: (tasks) => this.renderGantt(tasks.slice(0, 30)),
-      error: () => this.renderEmptyState('Chưa tải được dữ liệu Gantt. Kiểm tra backend có đang chạy không.'),
-    });
+    const cachedTasks = this.taskService.getCachedTaskViews();
+
+    if (cachedTasks.length) {
+      this.renderGantt(cachedTasks.slice(0, 50));
+    }
+
+    this.taskService
+      .getTaskViews({ pageNumber: 1, pageSize: 300 })
+      .pipe(
+        timeout(6000),
+        catchError(() => of(cachedTasks)),
+      )
+      .subscribe((tasks) => {
+        const visibleTasks = tasks.length ? tasks : cachedTasks;
+
+        if (visibleTasks.length) {
+          this.renderGantt(visibleTasks.slice(0, 50));
+          return;
+        }
+
+        this.renderEmptyState('Chưa có dữ liệu Gantt. Hãy kiểm tra backend hoặc tạo task có deadline.');
+      });
   }
 
   private renderGantt(tasks: Task[]): void {
+    const ganttElement = document.querySelector('#gantt');
+    if (ganttElement) {
+      ganttElement.innerHTML = '';
+    }
+
     const ganttTasks = tasks
       .filter((task) => this.isValidDate(task.deadline))
       .map((task) => ({
@@ -44,7 +68,13 @@ export class Gantt implements AfterViewInit {
     this.emptyMessage = '';
     this.changeDetector.detectChanges();
 
-    new FrappeGantt('#gantt', ganttTasks);
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector('#gantt');
+      if (!target) return;
+
+      target.innerHTML = '';
+      new FrappeGantt('#gantt', ganttTasks);
+    });
   }
 
   private renderEmptyState(message: string): void {

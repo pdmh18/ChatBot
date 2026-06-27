@@ -1,4 +1,4 @@
-﻿.chat-toggle {
+.chat-toggle {
   position: fixed;
   right: 24px;
   bottom: 24px;
@@ -133,7 +133,7 @@
   min-width: 0;
   padding: 10px;
   border: 1px solid #cfd6e1;
-  border-radius: 8px;
+  border-radius: 14px;
 }
 
 .chat-input input:focus {
@@ -143,7 +143,7 @@
 
 .chat-input button {
   border: none;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #2563eb;
   color: white;
   padding: 0 14px;

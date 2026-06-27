@@ -284,23 +284,33 @@ export class Tasks implements OnInit {
     this.suggestionTask = task;
     this.riskResult = null;
     this.suggestedDevelopers = [];
-    this.aiSuggestionMessage = 'AI đang phân tích năng lực và tải công việc hiện tại...';
+    this.aiSuggestionMessage = 'AI đang phân tích năng lực và dự báo rủi ro...';
     this.isSuggestionLoading = true;
     this.cdr.detectChanges();
 
-    this.aiService.suggestAssignees(task.id).subscribe({
-      next: (suggestions) => {
-        this.suggestedDevelopers = suggestions.map((item) => this.mapStaffMatchToSuggestion(item));
-        this.aiSuggestionMessage = this.suggestedDevelopers.length
+    forkJoin({
+      suggestions: this.aiService
+        .suggestAssignees(task.id)
+        .pipe(catchError(() => of([] as StaffMatchResult[]))),
+      risk: this.aiService
+        .predictRisk(task.id)
+        .pipe(catchError(() => of(null as RiskPredictionResult | null))),
+    }).subscribe({
+      next: ({ suggestions, risk }) => {
+        this.suggestedDevelopers = suggestions.length
+          ? suggestions.map((item) => this.mapStaffMatchToSuggestion(item))
+          : this.buildDeveloperSuggestions();
+        this.aiSuggestionMessage = suggestions.length
           ? ''
           : 'AI chưa tìm được nhân sự phù hợp cho task này.';
+        this.riskResult = risk;
         this.isSuggestionLoading = false;
         this.cdr.detectChanges();
       },
-      error: (error) => {
+      error: () => {
         this.suggestedDevelopers = this.buildDeveloperSuggestions();
         this.aiSuggestionMessage =
-          'AI server chưa xử lý được yêu cầu này. Đang hiển thị gợi ý dự phòng từ dữ liệu người dùng.';
+          'AI server chưa xử lý được yêu cầu này. Đang hiển thị gợi ý dự phòng.';
         this.isSuggestionLoading = false;
         this.cdr.detectChanges();
       },
@@ -504,29 +514,6 @@ export class Tasks implements OnInit {
     }));
   }
 
-  private predictRiskForSuggestion(taskId: number): void {
-    this.aiSuggestionMessage = 'Đã gán người phụ trách. AI đang dự báo rủi ro trễ hạn...';
-
-    this.aiService.predictRisk(taskId).subscribe({
-      next: (risk) => {
-        this.riskResult = risk;
-        this.aiSuggestionMessage = '';
-        this.isSuggestionLoading = false;
-        this.loadTasks();
-        this.cdr.detectChanges();
-      },
-      error: (error) => {
-        this.riskResult = null;
-        this.aiSuggestionMessage =
-          error?.error?.message ||
-          'Đã gán task, nhưng chưa dự báo được rủi ro AI. Bạn có thể thử lại sau.';
-        this.isSuggestionLoading = false;
-        this.loadTasks();
-        this.cdr.detectChanges();
-      },
-    });
-  }
-
   private mapStaffMatchToSuggestion(item: StaffMatchResult): DeveloperSuggestion {
     return {
       id: item.maNguoiDuocDeXuat,
@@ -553,8 +540,6 @@ export class Tasks implements OnInit {
     return new Date().toISOString().slice(0, 10);
   }
 }
-
-
 
 
 

@@ -1,1 +1,155 @@
-@import 'frappe-gantt';
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+
+:root {
+  --app-font: "Inter", "Segoe UI", Arial, sans-serif;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-soft: #475569;
+  --surface: #ffffff;
+  --page-bg: #f3f6fb;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --danger: #dc2626;
+  --warning: #f59e0b;
+  --success: #16a34a;
+
+  font-family: var(--app-font);
+  color: var(--text-main);
+  background: var(--page-bg);
+}
+
+* {
+  box-sizing: border-box;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: var(--app-font);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-main);
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-weight: 400;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  letter-spacing: -0.01em;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+strong,
+b {
+  letter-spacing: -0.025em;
+}
+
+body.ai-alert-modal-open {
+  overflow: hidden;
+}
+
+/* ===== Manager UI polish: đồng bộ giao diện toàn app ===== */
+:root {
+  --radius-xs: 10px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --shadow-sm: 0 8px 22px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 18px 46px rgba(15, 23, 42, 0.08);
+  --shadow-blue: 0 16px 34px rgba(37, 99, 235, 0.14);
+}
+
+html {
+  background: var(--page-bg);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+h1, h2, h3 {
+  color: #0b1220;
+}
+
+p, small, span, label, button, input, select, textarea, td, th, a, div {
+  font-family: var(--app-font) !important;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input, select, textarea {
+  outline: none;
+}
+
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 2px;
+}
+
+.card, .chart-card, .insight-card, .workload-card, .panel, .compare-card, .overview-card, .alert-section, .hero-panel {
+  border-color: var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+.card:hover, .panel:hover, .compare-card:hover, .overview-card:hover, .alert-section:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.empty-panel, .empty-chart, .empty-insight, .empty-table {
+  border-radius: var(--radius-md) !important;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #edf2f7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #edf2f7;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

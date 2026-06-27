@@ -1,4 +1,4 @@
-﻿.toolbar {
+.toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -12,7 +12,7 @@
   min-width: 180px;
   padding: 0 12px;
   border: 1px solid #cfd6e1;
-  border-radius: 8px;
+  border-radius: 14px;
   background: white;
   font-size: 14px;
 }
@@ -25,7 +25,7 @@
   height: 44px;
   padding: 0 18px;
   border: none;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #2563eb;
   color: white;
   font-weight: 700;
@@ -36,7 +36,7 @@
   width: 100%;
   overflow-x: auto;
   border: 1px solid #e1e5ea;
-  border-radius: 8px;
+  border-radius: 14px;
   background: white;
 }
 
@@ -138,7 +138,7 @@
   margin-top: 16px;
   padding: 18px 20px;
   border: 1px dashed #b7c7e6;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #f8fbff;
   color: #475569;
 }
@@ -160,7 +160,7 @@
   flex-direction: column;
   overflow: hidden;
   background: white;
-  border-radius: 8px;
+  border-radius: 14px;
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
 }
 
@@ -192,7 +192,7 @@
   width: 36px;
   height: 36px;
   border: none;
-  border-radius: 8px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.12);
   color: white;
   font-size: 16px;
@@ -223,7 +223,7 @@
 .detail-item {
   padding: 14px;
   border: 1px solid #e1e5ea;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #f8fafc;
 }
 
@@ -250,6 +250,27 @@
   padding: 18px;
 }
 
+.ai-risk-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  color: #111827;
+  font-weight: 800;
+}
+
+.section-title small {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .developer-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 250px 96px;
@@ -257,7 +278,7 @@
   align-items: center;
   padding: 14px 16px;
   border: 1px solid #e1e5ea;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #fff;
 }
 
@@ -349,7 +370,7 @@
 .ai-message,
 .risk-result-card {
   padding: 14px;
-  border-radius: 8px;
+  border-radius: 14px;
   line-height: 1.45;
 }
 
@@ -363,6 +384,12 @@
   border: 1px solid #bbf7d0;
   background: #f0fdf4;
   color: #166534;
+}
+
+.risk-result-card.loading {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .risk-result-card.danger {
@@ -454,7 +481,7 @@
 .lookup-message {
   margin-bottom: 12px;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: 14px;
 }
 
 .success-message {
@@ -500,7 +527,7 @@
   margin: -2px 0 14px;
   padding: 12px 14px;
   border: 1px solid #dbe5f3;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #f8fbff;
   color: #475569;
 }
@@ -529,4 +556,66 @@
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+:host {
+  font-family: var(--app-font);
+}
+
+.modal,
+.task-table,
+.toolbar input,
+.toolbar select,
+.task-form input,
+.task-form select,
+.task-form textarea,
+button {
+  font-family: var(--app-font);
+  letter-spacing: 0;
+}
+
+.modal-header p {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.detail-item strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.developer-card {
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 230px) 96px;
+}
+
+.developer-title {
+  line-height: 1.35;
+}
+
+.developer-title strong {
+  overflow-wrap: anywhere;
+}
+
+.score-metrics small {
+  line-height: 1.35;
+}
+
+.developer-card button {
+  align-self: center;
+}
+
+/* Manager UI polish */
+:host { display: block; color: var(--text-main); }
+button, input, select, textarea { font-family: var(--app-font) !important; }
+.task-card, .task-form, .filter-card, .modal-content, .kanban-card, .card, .panel, table, .table-wrapper {
+  border-radius: 18px !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+button, .btn, .action-btn {
+  border-radius: 12px !important;
+  font-weight: 800 !important;
 }
