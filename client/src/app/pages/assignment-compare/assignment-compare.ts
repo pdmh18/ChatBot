@@ -1,6 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, NgZone } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { catchError, forkJoin, map, of } from 'rxjs';
+import { catchError, finalize, forkJoin, from, map, mergeMap, of } from 'rxjs';
 import { StaffMatchResult } from '../../models/ai';
 import { LookupItemDto, UserLookupDto } from '../../models/lookups.model';
 import { Task } from '../../models/task';
@@ -74,10 +74,13 @@ export class AssignmentCompare implements OnInit {
   newTaskCount = 5;
   hoursPerTask = 8;
   urgentPercent = 40;
-  message = 'Đang tự động tải dữ liệu từ backend API...';
+  message = 'Đang tải dữ liệu nền từ backend API...';
   dataWarning = '';
   isLoading = false;
+  isAiSuggestionLoading = false;
   selectedAssignment: AiAssignment | null = null;
+  hasLoadedInitialData = false;
+  hasLoadedAiSuggestions = false;
 
   developerLoads: DeveloperLoad[] = [];
   compareResults: CompareResult[] = [];
@@ -89,49 +92,68 @@ export class AssignmentCompare implements OnInit {
   readonly sprintMaxHours = 60;
   readonly monthlyFullTimeHours = 160;
 
+  private suggestionDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+  private suggestionRequestSeq = 0;
+
   constructor(
     private lookupService: LookupService,
     private aiService: AiService,
-    private taskService: TaskService
+    private taskService: TaskService,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {}
 
   ngOnInit(): void {
+    // Vừa mở trang là tự tải toàn bộ dữ liệu nền từ API.
+    // Người dùng không cần kéo slider "Số task mới" thì dữ liệu mới hiện.
     this.loadData();
   }
 
 
   onScenarioChanged(): void {
+    // Slider/chọn dự án chỉ mô phỏng lại kịch bản.
+    // Không gọi API AI tự động để tránh chậm và tránh request liên tục.
     this.recalculate();
-    this.loadAiAssignmentSuggestions();
+    this.hasLoadedAiSuggestions = false;
+    this.isAiSuggestionLoading = false;
+    this.message = 'Đã cập nhật kịch bản mô phỏng. Bấm “Phân tích bằng AI” để tải gợi ý giao task từ API.';
+    this.refreshUi();
   }
 
   loadData(): void {
     this.isLoading = true;
-    this.message = 'Đang tự động tải dữ liệu từ backend API...';
+    this.hasLoadedInitialData = false;
+    this.message = 'Đang tự động tải dữ liệu nền từ backend API...';
 
+    // Projects, Users, Tasks được gọi song song và có cache ở service.
+    // Khi dữ liệu nền xong, UI render ngay; AI suggestions chạy tiếp ở nền.
     forkJoin({
       projects: this.lookupService.getProjects(),
       users: this.lookupService.getUsers(),
-      tasks: this.taskService.getTaskViews({ pageNumber: 1, pageSize: 200 }),
+      tasks: this.taskService.getTaskViews({ pageNumber: 1, pageSize: 300 }),
     }).subscribe({
       next: ({ projects, users, tasks }) => {
         this.projects = projects;
         this.users = users;
         this.tasks = tasks;
-        this.selectedProjectId = projects[0]?.id ?? 0;
+        this.selectedProjectId = this.selectedProjectId || projects[0]?.id || 0;
+        this.hasLoadedInitialData = true;
+
+        // Render dữ liệu nền ngay lập tức: KPI, workload, bảng nhân sự.
         this.recalculate();
-        this.loadAiAssignmentSuggestions();
-        this.message = 'Dữ liệu đã được tự động tải từ backend API.';
         this.isLoading = false;
-        window.setTimeout(() => (this.message = ''), 2500);
+        this.message = 'Đã tải dữ liệu nền. Bấm “Phân tích bằng AI” để tải gợi ý giao task.';
+        this.refreshUi();
       },
       error: () => {
         this.projects = [];
         this.users = [];
         this.tasks = [];
+        this.hasLoadedInitialData = false;
         this.message = 'Chưa tải được dữ liệu API. Kiểm tra backend port 49261 rồi mở lại trang So sánh AI.';
         this.isLoading = false;
         this.recalculate();
+        this.refreshUi();
       },
     });
   }
@@ -143,6 +165,7 @@ export class AssignmentCompare implements OnInit {
     if (!this.projects.length || !this.users.length) {
       this.dataWarning = 'Thiếu dữ liệu dự án hoặc nhân sự từ backend API nên chưa thể lập báo cáo so sánh.';
       this.resetComputedData();
+      this.refreshUi();
       return;
     }
 
@@ -152,16 +175,21 @@ export class AssignmentCompare implements OnInit {
     if (!developers.length) {
       this.dataWarning = 'Backend chưa có nhân sự vai trò lập trình viên để AI phân bổ task.';
       this.resetComputedData();
+      this.refreshUi();
       return;
     }
 
     this.dataWarning = '';
     const totalNewHours = this.newTaskCount * this.hoursPerTask;
 
-    this.developerLoads = developers.map((user, index) => {
+    this.developerLoads = developers.map((user) => {
       const assignedTasks = projectTasks.filter((task) => task.assigneeId === user.id || task.assignee === user.hoTen);
-      const rawHours = assignedTasks.reduce((sum, task) => sum + (task.estimatedHours ?? this.hoursPerTask), 0);
-      const currentHours = this.normalizeSprintHours(rawHours, assignedTasks.length, index);
+      // Dùng trực tiếp tổng giờ ước tính từ backend, không normalize giả tạo
+      const currentHours = this.clamp(
+        assignedTasks.reduce((sum, task) => sum + (task.estimatedHours ?? this.hoursPerTask), 0),
+        0,
+        this.sprintMaxHours * 2
+      );
       const currentRisk = assignedTasks.length
         ? Math.round(assignedTasks.reduce((sum, task) => sum + task.riskScore, 0) / assignedTasks.length)
         : this.getBaseRiskByLoad(currentHours);
@@ -207,7 +235,11 @@ export class AssignmentCompare implements OnInit {
       },
     ];
 
-    this.aiAssignments = [];
+    if (!this.isAiSuggestionLoading) {
+      this.aiAssignments = [];
+    }
+
+    this.refreshUi();
   }
 
 
@@ -272,12 +304,28 @@ export class AssignmentCompare implements OnInit {
     return Math.max(0, (this.traditionalResult?.predictedDelayDays ?? 0) - (this.aiResult?.predictedDelayDays ?? 0));
   }
 
+  loadAiAnalysis(): void {
+    if (this.isLoading || this.isAiSuggestionLoading) return;
+
+    if (!this.hasLoadedInitialData) {
+      this.message = 'Dữ liệu nền chưa sẵn sàng. Vui lòng chờ hệ thống tải xong Projects, Tasks và Nhân sự.';
+      return;
+    }
+
+    this.message = 'Đang phân tích AI và tải gợi ý giao task từ API...';
+    this.hasLoadedAiSuggestions = true;
+    this.refreshUi();
+    this.loadAiAssignmentSuggestions();
+  }
+
   openExplanation(assignment?: AiAssignment): void {
     this.selectedAssignment = assignment ?? this.aiAssignments[0] ?? null;
+    this.refreshUi();
   }
 
   closeExplanation(): void {
     this.selectedAssignment = null;
+    this.refreshUi();
   }
 
   applyAiPlan(): void {
@@ -313,30 +361,80 @@ export class AssignmentCompare implements OnInit {
   }
 
 
+  private queueAiAssignmentSuggestions(delayMs = 350): void {
+    if (this.suggestionDebounceHandle) {
+      clearTimeout(this.suggestionDebounceHandle);
+    }
+
+    this.suggestionDebounceHandle = setTimeout(() => {
+      this.loadAiAssignmentSuggestions();
+    }, delayMs);
+  }
+
   private loadAiAssignmentSuggestions(): void {
     const tasksForSuggestion = this.getTasksForAiSuggestion();
+    const requestSeq = ++this.suggestionRequestSeq;
 
     if (!tasksForSuggestion.length || !this.developerLoads.length) {
       this.aiAssignments = [];
+      this.isAiSuggestionLoading = false;
+      this.hasLoadedAiSuggestions = true;
+      this.message = 'Chưa có đủ task hoặc nhân sự để AI đề xuất giao việc.';
+      this.cdr.detectChanges();
       return;
     }
 
-    const requests = tasksForSuggestion.map((task) =>
-      this.aiService.suggestAssignees(task.id).pipe(
-        map((suggestions) => this.mapBestAiSuggestion(task, suggestions)),
-        catchError(() => of(null))
+    // Không chờ toàn bộ API xong mới render. Kết quả nào về trước sẽ hiện trước.
+    // Giới hạn 3 request song song để backend/AI server không bị nghẽn.
+    this.aiAssignments = [];
+    this.isAiSuggestionLoading = true;
+
+    from(tasksForSuggestion)
+      .pipe(
+        mergeMap(
+          (task) =>
+            this.aiService.suggestAssignees(task.id).pipe(
+              map((suggestions) => this.mapBestAiSuggestion(task, suggestions)),
+              catchError(() => of(null))
+            ),
+          3
+        ),
+        finalize(() => {
+          if (requestSeq !== this.suggestionRequestSeq) return;
+
+          // Bảo đảm Angular render lại ngay khi API AI chạy xong.
+          // Trước đó có trường hợp API trả kết quả nhưng UI chỉ hiện sau khi click sang control khác.
+          this.ngZone.run(() => {
+            this.isAiSuggestionLoading = false;
+            this.hasLoadedAiSuggestions = true;
+
+            if (!this.aiAssignments.length) {
+              this.message = 'API AI chưa trả được dữ liệu đề xuất giao task cho dự án này.';
+              window.setTimeout(() => {
+                this.ngZone.run(() => {
+                  this.message = '';
+                  this.cdr.detectChanges();
+                });
+              }, 3500);
+            } else {
+              this.message = '';
+            }
+
+            this.cdr.detectChanges();
+          });
+        })
       )
-    );
+      .subscribe((assignment) => {
+        if (requestSeq !== this.suggestionRequestSeq || !assignment) return;
 
-    forkJoin(requests).subscribe((assignments) => {
-      const validAssignments = assignments.filter((item): item is AiAssignment => !!item);
-      this.aiAssignments = validAssignments;
-
-      if (!validAssignments.length) {
-        this.message = 'API AI chưa trả được dữ liệu đề xuất giao task cho dự án này.';
-        window.setTimeout(() => (this.message = ''), 3500);
-      }
-    });
+        this.ngZone.run(() => {
+          // Luôn gán mảng mới để Angular cập nhật @for ngay lập tức.
+          this.aiAssignments = [...this.aiAssignments, assignment]
+            .sort((a, b) => b.confidence - a.confidence);
+          this.hasLoadedAiSuggestions = true;
+          this.cdr.detectChanges();
+        });
+      });
   }
 
   private getTasksForAiSuggestion(): Task[] {
@@ -407,6 +505,7 @@ export class AssignmentCompare implements OnInit {
     this.aiAssignments = [];
     this.traditionalWorkloads = [];
     this.aiWorkloads = [];
+    this.refreshUi();
   }
 
   private normalizeInputs(): void {
@@ -425,13 +524,9 @@ export class AssignmentCompare implements OnInit {
     return normalized.includes('lập trình') || normalized.includes('lap trinh') || normalized.includes('developer');
   }
 
-  private normalizeSprintHours(rawHours: number, taskCount: number, index: number): number {
-    if (rawHours >= this.sprintMinHours && rawHours <= this.sprintMaxHours) return Math.round(rawHours);
-
-    const baseline = this.sprintMinHours + ((index * 7 + taskCount * 5) % 25);
-    const taskAdjustment = Math.min(8, Math.round(taskCount * 1.2));
-    return this.clamp(baseline + taskAdjustment, this.sprintMinHours, this.sprintMaxHours);
-  }
+  // normalizeSprintHours đã bị xóa: hàm cũ bỏ qua dữ liệu giờ thực từ backend khi
+  // rawHours nằm ngoài [sprintMinHours, sprintMaxHours], thay bằng giá trị giả dựa vào index.
+  // Nay developerLoads dùng trực tiếp tổng soGioUocTinh từ backend.
 
   private calculateTraditionalRisk(totalNewHours: number): number {
     const maxLoad = Math.max(0, ...this.traditionalWorkloads.map((developer) => developer.projectedHours));
@@ -597,6 +692,20 @@ export class AssignmentCompare implements OnInit {
         ],
       };
     });
+  }
+
+  private refreshUi(): void {
+    // Đảm bảo toàn bộ dữ liệu trên trang So sánh AI render ngay sau khi state thay đổi.
+    // Một số phần đang cập nhật từ subscribe/setTimeout nên nếu không ép change detection,
+    // UI có thể chỉ hiện sau khi người dùng click qua lại control khác.
+    this.cdr.markForCheck();
+    window.setTimeout(() => {
+      try {
+        this.cdr.detectChanges();
+      } catch {
+        // Bỏ qua nếu component đã bị destroy khi người dùng chuyển trang.
+      }
+    }, 0);
   }
 
   private clamp(value: number, min: number, max: number): number {

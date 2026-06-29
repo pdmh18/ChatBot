@@ -1,16 +1,12 @@
 ﻿import { Routes } from '@angular/router';
-import { Login } from './pages/login/login';
-import { Dashboard } from './pages/dashboard/dashboard';
-import { Tasks } from './pages/tasks/tasks';
-import { AiAlerts } from './pages/ai-alerts/ai-alerts';
-import { Kanban } from './pages/kanban/kanban';
-import { Gantt } from './pages/gantt/gantt';
-import { AssignmentCompare } from './pages/assignment-compare/assignment-compare';
 import { MainLayout } from './layouts/main-layout/main-layout';
 import { authGuard } from './guards/auth-guard';
 
 export const routes: Routes = [
-  { path: 'login', component: Login },
+  {
+    path: 'login',
+    loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+  },
 
   {
     path: '',
@@ -18,12 +14,30 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: 'dashboard', component: Dashboard },
-      { path: 'tasks', component: Tasks },
-      { path: 'kanban', component: Kanban },
-      { path: 'gantt', component: Gantt },
-      { path: 'ai-alerts', component: AiAlerts },
-      { path: 'assignment-compare', component: AssignmentCompare },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./pages/dashboard/dashboard').then((m) => m.Dashboard),
+      },
+      {
+        path: 'tasks',
+        loadComponent: () => import('./pages/tasks/tasks').then((m) => m.Tasks),
+      },
+      {
+        path: 'kanban',
+        loadComponent: () => import('./pages/kanban/kanban').then((m) => m.Kanban),
+      },
+      {
+        path: 'gantt',
+        loadComponent: () => import('./pages/gantt/gantt').then((m) => m.Gantt),
+      },
+      {
+        path: 'ai-alerts',
+        loadComponent: () => import('./pages/ai-alerts/ai-alerts').then((m) => m.AiAlerts),
+      },
+      {
+        path: 'assignment-compare',
+        loadComponent: () => import('./pages/assignment-compare/assignment-compare').then((m) => m.AssignmentCompare),
+      },
     ],
   },
 ];

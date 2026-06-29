@@ -338,16 +338,18 @@ export class Tasks implements OnInit {
     this.taskService
       .assignTask(taskId, { maNguoiPhuTrach: developer.id })
       .pipe(
-        switchMap(() =>
-          forkJoin({
+        switchMap(() => {
+          // Xóa cache để backend tính lại PhanTramTai/diemKhoiLuong sau khi giao việc
+          this.aiService.clearSuggestAssigneesCache(taskId);
+          return forkJoin({
             suggestions: this.aiService
               .suggestAssignees(taskId)
               .pipe(catchError(() => of([] as StaffMatchResult[]))),
             risk: this.aiService
               .predictRisk(taskId)
               .pipe(catchError(() => of(null as RiskPredictionResult | null))),
-          })
-        )
+          });
+        })
       )
       .subscribe({
         next: ({ suggestions, risk }) => {
