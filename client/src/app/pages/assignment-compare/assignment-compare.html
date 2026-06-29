@@ -7,9 +7,6 @@
         Màn hình giúp người quản lý thấy rõ AI giảm rủi ro trễ hạn, cân bằng workload và giải thích vì sao AI đề xuất phân công.
       </p>
     </div>
-    <button class="primary-action" type="button" (click)="applyAiPlan()" [disabled]="!aiAssignments.length">
-      Áp dụng phân công AI
-    </button>
   </div>
 
   @if (message) {
@@ -237,11 +234,20 @@
         <div>
           <h3>AI đề xuất giao task</h3>
         </div>
-        <button class="secondary-action explain-ai-button" type="button" (click)="openExplanation()" [disabled]="!aiAssignments.length" aria-label="Mở giải thích quyết định AI từ API">
-          <span class="explain-icon">i</span>
-          <span class="explain-text">Giải thích AI</span>
-        </button>
+        <div class="ai-panel-actions">
+          <button class="primary-action analyze-ai-button" type="button" (click)="loadAiAnalysis()" [disabled]="isLoading || isAiSuggestionLoading || !hasLoadedInitialData">
+            {{ isAiSuggestionLoading ? 'Đang phân tích...' : 'Phân tích bằng AI' }}
+          </button>
+          <button class="secondary-action explain-ai-button" type="button" (click)="openExplanation()" [disabled]="!aiAssignments.length" aria-label="Mở giải thích quyết định AI từ API">
+            <span class="explain-icon">i</span>
+            <span class="explain-text">Giải thích AI</span>
+          </button>
+        </div>
       </div>
+
+      @if (isAiSuggestionLoading) {
+        <div class="loading-inline">Đang gọi API AI song song và hiển thị từng kết quả...</div>
+      }
 
       <div class="assignment-list">
         @for (assignment of aiAssignments; track trackByAssignment($index, assignment)) {
@@ -257,7 +263,7 @@
             </div>
           </div>
         } @empty {
-          <div class="empty-panel">Chưa có gợi ý vì thiếu dữ liệu nhân sự hoặc task.</div>
+          <div class="empty-panel">{{ isAiSuggestionLoading ? 'Đang tải gợi ý AI, kết quả sẽ hiện dần...' : (hasLoadedAiSuggestions ? 'Chưa có gợi ý vì thiếu dữ liệu nhân sự hoặc task.' : 'Bấm “Phân tích bằng AI” để gọi API và tải gợi ý giao task.') }}</div>
         }
       </div>
     </article>

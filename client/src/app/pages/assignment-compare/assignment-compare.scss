@@ -867,3 +867,42 @@
     grid-template-columns: 1fr;
   }
 }
+
+.loading-inline {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Nút phân tích AI thủ công: tránh gọi API AI nặng khi mới mở trang hoặc kéo slider */
+.ai-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.analyze-ai-button {
+  min-width: 168px;
+  height: 42px;
+  border-radius: 14px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .ai-panel-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .analyze-ai-button,
+  .explain-ai-button {
+    width: 100%;
+  }
+}

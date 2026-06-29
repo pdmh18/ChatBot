@@ -1,6 +1,6 @@
 ﻿import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map, tap } from 'rxjs';
+import { Observable, map, shareReplay, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   AssignTaskRequest,
@@ -26,6 +26,7 @@ interface ApiListResponse<T> {
 export class TaskService {
   private readonly apiUrl = `${environment.apiUrl}/tasks`;
   private cachedTaskViews: Task[] = [];
+  private taskViewsCache = new Map<string, Observable<Task[]>>();
 
   constructor(private http: HttpClient) {}
 
@@ -38,14 +39,22 @@ export class TaskService {
   }
 
   getTaskViews(params?: TaskQueryParams): Observable<Task[]> {
-    return this.getTasks(params).pipe(
+    const cacheKey = JSON.stringify(params ?? {});
+    const cached = this.taskViewsCache.get(cacheKey);
+    if (cached) return cached;
+
+    const request$ = this.getTasks(params).pipe(
       map((items) => items.map((item) => this.mapListItemToTask(item))),
       tap((tasks) => {
         if (tasks.length) {
           this.cachedTaskViews = tasks;
         }
       }),
+      shareReplay({ bufferSize: 1, refCount: false })
     );
+
+    this.taskViewsCache.set(cacheKey, request$);
+    return request$;
   }
 
   getCachedTaskViews(): Task[] {
