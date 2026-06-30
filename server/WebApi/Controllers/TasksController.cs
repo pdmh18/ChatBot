@@ -2,7 +2,7 @@
 using Application.Features.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-
+using Application.Common.DTOs;
 namespace WebApi.Controllers
 {
     [ApiController]
@@ -17,7 +17,7 @@ namespace WebApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IReadOnlyList<TaskListItemDto>>> GetList(
+        public async Task<ActionResult<PagedResultDto<TaskListItemDto>>> GetList(
             [FromQuery] TaskQueryParameters query,
             CancellationToken cancellationToken)
         {
