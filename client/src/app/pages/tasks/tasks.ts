@@ -37,12 +37,14 @@ export class Tasks implements OnInit {
   tasks: Task[] = [];
   filteredTasks: Task[] = [];
   visibleTasks: Task[] = [];
-  readonly defaultVisibleTaskCount = 100;
-  private readonly renderBatchSize = 200;
-  private renderTaskLimit = this.defaultVisibleTaskCount;
-  private renderGeneration = 0;
-  showAllTasks = false;
-  isRenderingAllTasks = false;
+  selectedProjectFilterId: number | 'All' = 'All';
+  currentPage = 1;
+  pageSize = 10;
+  readonly pageSizeOptions = [10, 20, 50];
+  totalTasks = 0;
+  totalPages = 1;
+  hasPreviousPage = false;
+  hasNextPage = false;
   selectedTask: Task | null = null;
   suggestionTask: Task | null = null;
 
@@ -91,89 +93,96 @@ export class Tasks implements OnInit {
     this.loadTasks();
   }
 
-  get hasHiddenTasks(): boolean {
-    return this.filteredTasks.length > this.defaultVisibleTaskCount;
+  get startItemIndex(): number {
+    return this.totalTasks ? (this.currentPage - 1) * this.pageSize + 1 : 0;
   }
 
-  get hiddenTaskCount(): number {
-    return Math.max(this.filteredTasks.length - this.visibleTasks.length, 0);
+  get endItemIndex(): number {
+    return Math.min(this.currentPage * this.pageSize, this.totalTasks);
+  }
+
+  get visiblePages(): number[] {
+    const maxVisible = 5;
+    const half = Math.floor(maxVisible / 2);
+    let start = Math.max(1, this.currentPage - half);
+    let end = Math.min(this.totalPages, start + maxVisible - 1);
+    start = Math.max(1, end - maxVisible + 1);
+
+    return Array.from({ length: Math.max(end - start + 1, 0) }, (_, index) => start + index);
   }
 
   onTaskFiltersChanged(): void {
-    this.showAllTasks = false;
-    this.applyTaskFilters();
+    this.currentPage = 1;
+    this.loadTasks();
   }
 
-  toggleTaskVisibility(): void {
-    this.showAllTasks = !this.showAllTasks;
-    this.renderTaskLimit = this.showAllTasks
-      ? Math.min(this.renderBatchSize, this.filteredTasks.length)
-      : this.defaultVisibleTaskCount;
-    this.updateVisibleTasks();
+  onPageSizeChanged(): void {
+    this.currentPage = 1;
+    this.loadTasks();
+  }
 
-    if (this.showAllTasks) {
-      this.scheduleRenderMoreTasks();
-    }
+  goToPage(page: number): void {
+    const nextPage = Math.min(Math.max(page, 1), this.totalPages);
+    if (nextPage === this.currentPage) return;
+    this.currentPage = nextPage;
+    this.loadTasks();
+  }
+
+  previousPage(): void {
+    if (!this.hasPreviousPage) return;
+    this.goToPage(this.currentPage - 1);
+  }
+
+  nextPage(): void {
+    if (!this.hasNextPage) return;
+    this.goToPage(this.currentPage + 1);
   }
 
   private applyTaskFilters(): void {
-    const keyword = this.searchText.trim().toLowerCase();
-
-    this.filteredTasks = this.tasks.filter((task) => {
-      const matchesSearch = !keyword || (task.name?.toLowerCase() ?? '').includes(keyword);
-      const matchesStatus = this.statusFilter === 'All' || task.status === this.statusFilter;
-      const matchesPriority = this.priorityFilter === 'All' || task.priority === this.priorityFilter;
-      return matchesSearch && matchesStatus && matchesPriority;
-    });
-
-    this.renderTaskLimit = this.showAllTasks
-      ? Math.min(this.renderBatchSize, this.filteredTasks.length)
-      : this.defaultVisibleTaskCount;
-    this.updateVisibleTasks();
-  }
-
-  private updateVisibleTasks(): void {
-    this.renderGeneration += 1;
-    const limit = this.showAllTasks ? this.renderTaskLimit : this.defaultVisibleTaskCount;
-    this.visibleTasks = this.filteredTasks.slice(0, limit);
-    this.isRenderingAllTasks = this.showAllTasks && this.visibleTasks.length < this.filteredTasks.length;
-  }
-
-  private scheduleRenderMoreTasks(): void {
-    const generation = this.renderGeneration;
-
-    window.setTimeout(() => {
-      if (!this.showAllTasks || generation !== this.renderGeneration) return;
-
-      this.renderTaskLimit = Math.min(
-        this.renderTaskLimit + this.renderBatchSize,
-        this.filteredTasks.length
-      );
-      this.visibleTasks = this.filteredTasks.slice(0, this.renderTaskLimit);
-      this.isRenderingAllTasks = this.visibleTasks.length < this.filteredTasks.length;
-      this.cdr.detectChanges();
-
-      if (this.isRenderingAllTasks) {
-        this.scheduleRenderMoreTasks();
-      }
-    }, 0);
+    this.filteredTasks = this.tasks;
+    this.visibleTasks = this.tasks;
   }
 
   loadTasks(): void {
     this.taskDataMessage = 'Đang tải danh sách task từ backend...';
 
-    this.taskService.getTaskViews({ pageNumber: 1, pageSize: 1000 }).subscribe({
-      next: (tasks) => {
-        this.tasks = tasks;
-        this.showAllTasks = false;
+    const params = {
+      pageNumber: this.currentPage,
+      pageSize: this.pageSize,
+      search: this.searchText.trim() || undefined,
+      projectId: this.selectedProjectFilterId === 'All' ? undefined : this.selectedProjectFilterId,
+      status: this.statusFilter === 'All' ? undefined : this.statusFilter,
+      priority: this.priorityFilter === 'All' ? undefined : this.priorityFilter,
+    };
+
+    this.taskService.getTaskViewsPage(params).subscribe({
+      next: (page) => {
+        this.tasks = page.items;
+        this.currentPage = page.pageNumber || this.currentPage;
+        this.pageSize = page.pageSize || this.pageSize;
+        this.totalTasks = page.totalItems ?? page.totalCount ?? page.items.length;
+        this.totalPages = Math.max(page.totalPages || Math.ceil(this.totalTasks / this.pageSize), 1);
+        this.hasPreviousPage = page.hasPreviousPage ?? this.currentPage > 1;
+        this.hasNextPage = page.hasNextPage ?? this.currentPage < this.totalPages;
+
+        if (this.currentPage > this.totalPages) {
+          this.currentPage = this.totalPages;
+          this.loadTasks();
+          return;
+        }
+
         this.applyTaskFilters();
-        this.taskDataMessage = tasks.length
+        this.taskDataMessage = page.items.length
           ? ''
-          : 'Backend chưa có task nào. Bấm + Thêm task để tạo task đầu tiên.';
+          : 'Không có task nào trong trang hoặc bộ lọc hiện tại.';
         this.cdr.detectChanges();
       },
       error: () => {
         this.tasks = [];
+        this.totalTasks = 0;
+        this.totalPages = 1;
+        this.hasPreviousPage = false;
+        this.hasNextPage = false;
         this.applyTaskFilters();
         this.taskDataMessage = 'Chưa tải được API danh sách task. Kiểm tra backend có đang chạy ở port 49261 không.';
         this.cdr.detectChanges();
@@ -248,6 +257,48 @@ export class Tasks implements OnInit {
 
   formatSuggestionReason(reason: string): string {
     return reason || 'AI chưa trả lý do chi tiết.';
+  }
+
+  getAssigneeDisplayName(task: Task): string {
+    if (task.assigneeId) {
+      const user = this.users.find((item) => item.id === task.assigneeId);
+      if (user?.hoTen) return user.hoTen;
+    }
+
+    return task.assignee || 'Chưa phân công';
+  }
+
+  getCreatorDisplayName(task: Task): string {
+    if (task.creatorId) {
+      const user = this.users.find((item) => item.id === task.creatorId);
+      if (user?.hoTen) return user.hoTen;
+    }
+
+    return task.creator || 'Chưa rõ';
+  }
+
+  getProjectShortLabel(task: Task): string {
+    return [task.project, task.sprint].filter(Boolean).join(' · ');
+  }
+
+  getDeadlineDate(value?: string | null): string {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString('vi-VN');
+  }
+
+  getDeadlineTime(value?: string | null): string {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  isOverdue(task: Task): boolean {
+    if (!task.deadline) return false;
+    const deadline = new Date(task.deadline);
+    return !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now() && !/hoan thanh|done|complete/i.test(task.status ?? '');
   }
   onProjectChange(projectName: string): void {
     const selectedProject = this.projects.find((project) => project.name === projectName);
