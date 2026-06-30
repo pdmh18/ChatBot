@@ -1,4 +1,4 @@
-﻿export type TaskStatus = string;
+export type TaskStatus = string;
 export type TaskPriority = string;
 
 export interface Task {
@@ -29,6 +29,17 @@ export interface Task {
   dependencyBlockedCount?: number | null;
   aiReason?: string | null;
   featureImportance?: string[] | null;
+}
+
+
+export interface PagedResult<T> {
+  items: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }
 
 export interface TaskQueryParams {

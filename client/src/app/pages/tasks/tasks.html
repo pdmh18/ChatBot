@@ -1,109 +1,185 @@
-<h2>Tasks</h2>
+<section class="tasks-page">
+  <div class="tasks-header">
+    <div>
+      <p class="eyebrow">TASK MANAGEMENT</p>
+      <h2>Danh sách công việc</h2>
+      <p>Quản lý, lọc theo dự án và theo dõi toàn bộ công việc bằng dữ liệu phân trang từ API.</p>
+    </div>
 
-@if (successMessage) {
-  <div class="success-message">{{ successMessage }}</div>
-}
+    <button type="button" class="add-btn" (click)="openAddTask()">
+      + Thêm task
+    </button>
+  </div>
 
-@if (lookupMessage) {
-  <div class="lookup-message">{{ lookupMessage }}</div>
-}
+  @if (successMessage) {
+    <div class="success-message">{{ successMessage }}</div>
+  }
 
-<div class="toolbar">
-  <input
-    type="text"
-    placeholder="Tìm task..."
-    [(ngModel)]="searchText"
-    (ngModelChange)="onTaskFiltersChanged()"
-  />
+  @if (lookupMessage) {
+    <div class="lookup-message">{{ lookupMessage }}</div>
+  }
 
-  <select [(ngModel)]="statusFilter" (ngModelChange)="onTaskFiltersChanged()">
-    <option value="All">Tất cả trạng thái</option>
-    @for (status of statuses; track status.id) {
-      <option [value]="status.name">{{ getStatusLabel(status.name) }}</option>
-    }
-  </select>
+  <div class="toolbar task-toolbar">
+    <label class="filter-field project-filter">
+      <span>Dự án</span>
+      <select [(ngModel)]="selectedProjectFilterId" (ngModelChange)="onTaskFiltersChanged()">
+        <option [ngValue]="'All'">Tất cả dự án</option>
+        @for (project of projects; track project.id) {
+          <option [ngValue]="project.id">{{ project.name }}</option>
+        }
+      </select>
+    </label>
 
-  <select [(ngModel)]="priorityFilter" (ngModelChange)="onTaskFiltersChanged()">
-    <option value="All">Tất cả ưu tiên</option>
-    @for (priority of priorities; track priority.id) {
-      <option [value]="priority.name">{{ getPriorityLabel(priority.name) }}</option>
-    }
-  </select>
+    <label class="filter-field search-field">
+      <span>Tìm kiếm</span>
+      <input
+        type="text"
+        placeholder="Tìm task theo tên..."
+        [(ngModel)]="searchText"
+        (keyup.enter)="onTaskFiltersChanged()"
+      />
+    </label>
 
-  <button type="button" class="add-btn" (click)="openAddTask()">
-    + Thêm task
-  </button>
-</div>
+    <label class="filter-field">
+      <span>Trạng thái</span>
+      <select [(ngModel)]="statusFilter" (ngModelChange)="onTaskFiltersChanged()">
+        <option value="All">Tất cả</option>
+        @for (status of statuses; track status.id) {
+          <option [value]="status.name">{{ getStatusLabel(status.name) }}</option>
+        }
+      </select>
+    </label>
 
-@if (filteredTasks.length) {
+    <label class="filter-field">
+      <span>Ưu tiên</span>
+      <select [(ngModel)]="priorityFilter" (ngModelChange)="onTaskFiltersChanged()">
+        <option value="All">Tất cả</option>
+        @for (priority of priorities; track priority.id) {
+          <option [value]="priority.name">{{ getPriorityLabel(priority.name) }}</option>
+        }
+      </select>
+    </label>
+
+    <button type="button" class="filter-btn" (click)="onTaskFiltersChanged()">
+      Lọc
+    </button>
+  </div>
+
   <div class="task-list-summary">
     <span>
-      Đang hiển thị
-      <strong>{{ visibleTasks.length }}</strong>
-      / {{ filteredTasks.length }} task
+      Hiển thị <strong>{{ startItemIndex }} - {{ endItemIndex }}</strong>
+      / <strong>{{ totalTasks }}</strong> công việc
     </span>
 
-    @if (hasHiddenTasks) {
-      <button type="button" class="show-all-btn" (click)="toggleTaskVisibility()">
-        {{ showAllTasks ? (isRenderingAllTasks ? 'Đang tải thêm...' : 'Thu gọn còn 100 task') : 'Hiện tất cả ' + filteredTasks.length + ' task' }}
-      </button>
-    }
+    <label class="page-size-control">
+      <span>Số dòng/trang</span>
+      <select [(ngModel)]="pageSize" (ngModelChange)="onPageSizeChanged()">
+        @for (size of pageSizeOptions; track size) {
+          <option [ngValue]="size">{{ size }}</option>
+        }
+      </select>
+    </label>
   </div>
-}
 
-<div class="table-card">
-  <table class="task-table">
-    <thead>
-      <tr>
-        <th>Tên task</th>
-        <th>Dự án</th>
-        <th>Sprint</th>
-        <th>Người phụ trách</th>
-        <th>Trạng thái</th>
-        <th>Ưu tiên</th>
-        <th>Deadline</th>
-        <th>Tiến độ</th>
-        <th>Risk AI</th>
-        <th>Hành động</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      @for (task of visibleTasks; track task.id) {
+  <div class="table-card">
+    <table class="task-table compact-task-table">
+      <thead>
         <tr>
-          <td class="task-name">{{ task.name }}</td>
-          <td>{{ task.project }}</td>
-          <td>{{ task.sprint }}</td>
-          <td>{{ task.assignee }}</td>
-          <td>
-            <span class="status-pill">{{ getStatusLabel(task.status) }}</span>
-          </td>
-          <td>{{ getPriorityLabel(task.priority) }}</td>
-          <td>{{ task.deadline }}</td>
-          <td>{{ task.progress ?? 0 }}%</td>
-          <td>
-            <span class="risk-pill" [class.high-risk]="task.riskScore >= 70">
-              {{ task.riskScore }}%
-            </span>
-          </td>
-          <td>
-            <div class="action-buttons">
-              <button type="button" class="table-btn primary" (click)="selectTask(task)">Xem</button>
-              <button type="button" class="table-btn secondary" (click)="showAiSuggestion(task)">Gợi ý AI</button>
-              <button type="button" class="table-btn danger" (click)="deleteTask(task)">Xóa</button>
-            </div>
-          </td>
+          <th class="col-task">Công việc</th>
+          <th>Trạng thái</th>
+          <th>Người phụ trách</th>
+          <th>Deadline</th>
+          <th>Ưu tiên</th>
+          <th>Tiến độ</th>
+          <th>Risk AI</th>
+          <th>Hành động</th>
         </tr>
-      }
-    </tbody>
-  </table>
-</div>
+      </thead>
 
-@if (!filteredTasks.length) {
-  <div class="empty-state">
-    {{ emptyTaskMessage }}
+      <tbody>
+        @for (task of visibleTasks; track task.id) {
+          <tr>
+            <td class="task-info-cell">
+              <div class="one-line-task" [title]="task.name">
+                <span class="task-flag">⚑</span>
+                <strong>{{ task.name }}</strong>
+              </div>
+              <div class="task-subline" [title]="getProjectShortLabel(task)">
+                {{ getProjectShortLabel(task) }}
+              </div>
+            </td>
+
+            <td>
+              <span class="status-pill" [class.done]="getStatusLabel(task.status).includes('Hoàn')" [class.blocked]="getStatusLabel(task.status).includes('chặn')">
+                {{ getStatusLabel(task.status) }}
+              </span>
+            </td>
+
+            <td class="person-cell">
+              <span class="avatar">{{ getAssigneeDisplayName(task).slice(0, 1).toUpperCase() }}</span>
+              <span class="person-name" [title]="getAssigneeDisplayName(task)">{{ getAssigneeDisplayName(task) }}</span>
+            </td>
+
+            <td class="deadline-cell" [class.overdue]="isOverdue(task)">
+              <span>{{ getDeadlineTime(task.deadline) }}</span>
+              <strong>{{ getDeadlineDate(task.deadline) }}</strong>
+            </td>
+
+            <td>
+              <span class="priority-pill">{{ getPriorityLabel(task.priority) }}</span>
+            </td>
+
+            <td>{{ task.progress ?? 0 }}%</td>
+
+            <td>
+              <span class="risk-pill" [class.high-risk]="task.riskScore >= 70">
+                {{ task.riskScore }}%
+              </span>
+            </td>
+
+            <td>
+              <div class="action-buttons compact-actions">
+                <button type="button" class="table-btn primary" (click)="selectTask(task)">Xem</button>
+                <button type="button" class="table-btn secondary" (click)="showAiSuggestion(task)">AI</button>
+                <button type="button" class="table-btn danger" (click)="deleteTask(task)">Xóa</button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
   </div>
-}
+
+  @if (!visibleTasks.length) {
+    <div class="empty-state">
+      {{ emptyTaskMessage }}
+    </div>
+  }
+
+  <div class="pagination-bar">
+    <div class="pagination-info">
+      Tổng <strong>{{ totalTasks }}</strong> công việc · Trang <strong>{{ currentPage }}</strong> / {{ totalPages || 1 }}
+    </div>
+
+    <div class="pagination-actions">
+      <button type="button" (click)="goToPage(1)" [disabled]="!hasPreviousPage">«</button>
+      <button type="button" (click)="previousPage()" [disabled]="!hasPreviousPage">‹</button>
+
+      @for (page of visiblePages; track page) {
+        <button
+          type="button"
+          class="page-number"
+          (click)="goToPage(page)"
+          [class.active]="page === currentPage">
+          {{ page }}
+        </button>
+      }
+
+      <button type="button" (click)="nextPage()" [disabled]="!hasNextPage">›</button>
+      <button type="button" (click)="goToPage(totalPages)" [disabled]="!hasNextPage">»</button>
+    </div>
+  </div>
+</section>
 
 @if (selectedTask) {
   <div class="modal-backdrop" (click)="closeTaskDetail()">
