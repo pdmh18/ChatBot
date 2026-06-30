@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Application.Common.DTOs;
 
 namespace Infrastructure.Persistence.Repositories
 {
@@ -22,9 +23,9 @@ namespace Infrastructure.Persistence.Repositories
             _context = context;
         }
 
-        public async Task<IReadOnlyList<TaskListItemDto>> GetListAsync(
-            TaskQueryParameters query,
-            CancellationToken cancellationToken = default)
+        public async Task<PagedResultDto<TaskListItemDto>> GetListAsync(
+    TaskQueryParameters query,
+    CancellationToken cancellationToken = default)
         {
             var dbQuery = _context.CongViecs
                 .AsNoTracking()
@@ -70,7 +71,9 @@ namespace Infrastructure.Persistence.Repositories
                 dbQuery = dbQuery.Where(x => x.DoUuTien == priority);
             }
 
-            return await dbQuery
+            var totalItems = await dbQuery.CountAsync(cancellationToken);
+
+            var items = await dbQuery
                 .OrderByDescending(x => x.NgayTao)
                 .Skip((query.PageNumber - 1) * query.PageSize)
                 .Take(query.PageSize)
@@ -101,6 +104,14 @@ namespace Infrastructure.Persistence.Repositories
                     TienDo = x.TienDo
                 })
                 .ToListAsync(cancellationToken);
+
+            return new PagedResultDto<TaskListItemDto>
+            {
+                Items = items,
+                PageNumber = query.PageNumber,
+                PageSize = query.PageSize,
+                TotalItems = totalItems
+            };
         }
 
         public async Task<TaskDetailDto?> GetByIdAsync(

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
+using Application.Common.DTOs;
 namespace Application.Features.Tasks
 {
     public class TaskService : ITaskService
@@ -52,18 +52,18 @@ namespace Application.Features.Tasks
             _taskRepository = taskRepository;
         }
 
-        public async Task<IReadOnlyList<TaskListItemDto>> GetListAsync(
-            TaskQueryParameters query,
-            CancellationToken cancellationToken = default)
+        public async Task<PagedResultDto<TaskListItemDto>> GetListAsync(
+    TaskQueryParameters query,
+    CancellationToken cancellationToken = default)
         {
-            var tasks = await _taskRepository.GetListAsync(query, cancellationToken);
+            var result = await _taskRepository.GetListAsync(query, cancellationToken);
 
-            foreach (var task in tasks)
+            foreach (var task in result.Items)
             {
                 ApplyRiskScore(task);
             }
 
-            return tasks;
+            return result;
         }
 
         public async Task<TaskDetailDto?> GetByIdAsync(

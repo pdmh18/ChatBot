@@ -4,14 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Application.Common.DTOs;
 
 namespace Application.Features.Tasks
 {
     public interface ITaskService
     {
-        Task<IReadOnlyList<TaskListItemDto>> GetListAsync(
-        TaskQueryParameters query,
-        CancellationToken cancellationToken = default);
+        Task<PagedResultDto<TaskListItemDto>> GetListAsync(
+    TaskQueryParameters query,
+    CancellationToken cancellationToken = default);
 
         Task<TaskDetailDto?> GetByIdAsync(
             int id,
