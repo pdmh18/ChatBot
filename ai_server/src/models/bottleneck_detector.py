@@ -31,7 +31,6 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 # ============================================================
 NODE_FEATURE_COLS = [
     "SoGioUocTinh",
-    "SoTaskBiAnhHuongPhiaSau",
     "TrangThaiHienTai_Encoded",
 ]
 LABEL_COL   = "Nhan_GhiNhanDiemNghen"
@@ -228,6 +227,12 @@ def train():
     print("\n📌 [2/4] Cấu hình GNN...")
     model     = GCN(num_features=data.num_features, hidden_dim=HIDDEN_DIM)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=5e-4)
+    # Tính class weight để xử lý mất cân bằng nhãn
+    train_labels = data.y[data.train_mask]
+    class_counts = torch.bincount(train_labels)
+    class_weights = (1.0 / class_counts.float())
+    class_weights = class_weights / class_weights.sum() * len(class_counts)
+    print(f"   Class weights: {class_weights.tolist()}")
 
     print(f"   Kiến trúc: GCNConv({data.num_features}) → GCNConv(64) → GCNConv(32) → GCNConv(2)")
     print(f"   Optimizer: Adam | lr={LEARNING_RATE} | weight_decay=5e-4")
@@ -248,7 +253,8 @@ def train():
         optimizer.zero_grad()
 
         out  = model(data.x, data.edge_index)
-        loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+        # loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+        loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask], weight=class_weights)
         loss.backward()
         optimizer.step()
 
