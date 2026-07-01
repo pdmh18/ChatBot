@@ -174,8 +174,8 @@ namespace Application.Features.Ai
             CancellationToken cancellationToken)
         {
             int? excludedTaskId = task.MaNguoiPhuTrach == userId
-                ?null
-                : task.MaCongViec;
+                ? task.MaCongViec
+                : null;
 
             var user = await _repository.GetUserDataAsync(
                 userId,
