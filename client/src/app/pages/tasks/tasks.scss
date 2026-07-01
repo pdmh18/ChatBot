@@ -352,6 +352,31 @@
   font-weight: 700;
   padding: 5px 8px;
 }
+
+.developer-card.assigned {
+  opacity: 0.48;
+  filter: grayscale(0.35);
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.developer-card.assigned .developer-title::after {
+  content: 'Đã chọn';
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.developer-card.assigned button {
+  background: #94a3b8;
+}
+
 .developer-card button {
   height: 38px;
   border: none;
@@ -601,6 +626,31 @@ button {
 
 .score-metrics small {
   line-height: 1.35;
+}
+
+
+.developer-card.assigned {
+  opacity: 0.48;
+  filter: grayscale(0.35);
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.developer-card.assigned .developer-title::after {
+  content: 'Đã chọn';
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.developer-card.assigned button {
+  background: #94a3b8;
 }
 
 .developer-card button {

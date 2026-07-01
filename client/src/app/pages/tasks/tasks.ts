@@ -25,6 +25,7 @@ interface DeveloperSuggestion {
   experienceScore?: number | null;
   model?: string;
   reason: string;
+  isAssigned?: boolean;
 }
 
 @Component({
@@ -78,6 +79,7 @@ export class Tasks implements OnInit {
   riskResult: RiskPredictionResult | null = null;
   aiSuggestionMessage = '';
   isSuggestionLoading = false;
+  private assignedDeveloperByTask = new Map<number, number>();
 
   constructor(
     private lookupService: LookupService,
@@ -282,6 +284,9 @@ export class Tasks implements OnInit {
 
   showAiSuggestion(task: Task): void {
     this.suggestionTask = task;
+    if (task.assigneeId) {
+      this.assignedDeveloperByTask.set(task.id, task.assigneeId);
+    }
     this.riskResult = null;
     this.suggestedDevelopers = [];
     this.aiSuggestionMessage = 'AI đang phân tích năng lực và dự báo rủi ro...';
@@ -325,8 +330,22 @@ export class Tasks implements OnInit {
     this.cdr.detectChanges();
   }
 
+  isDeveloperAssigned(developer: DeveloperSuggestion): boolean {
+    if (!this.suggestionTask) return false;
+
+    const assignedId =
+      this.assignedDeveloperByTask.get(this.suggestionTask.id) ?? this.suggestionTask.assigneeId;
+
+    return !!developer.isAssigned || (!!assignedId && assignedId === developer.id);
+  }
+
+  getAssignButtonLabel(developer: DeveloperSuggestion): string {
+    if (this.isDeveloperAssigned(developer)) return 'Đã chọn';
+    return this.isSuggestionLoading ? 'Đang xử lý' : 'Chọn';
+  }
+
   assignDeveloper(developer: DeveloperSuggestion): void {
-    if (!this.suggestionTask) return;
+    if (!this.suggestionTask || this.isDeveloperAssigned(developer)) return;
 
     const taskId = this.suggestionTask.id;
     const taskName = this.suggestionTask.name;
@@ -354,6 +373,14 @@ export class Tasks implements OnInit {
       .subscribe({
         next: ({ suggestions, risk }) => {
           this.successMessage = `Đã gán task "${taskName}" cho ${developer.name}.`;
+          this.assignedDeveloperByTask.set(taskId, developer.id);
+          if (this.suggestionTask?.id === taskId) {
+            this.suggestionTask = {
+              ...this.suggestionTask,
+              assigneeId: developer.id,
+              assignee: developer.name,
+            };
+          }
           this.suggestedDevelopers = suggestions.length
             ? suggestions.map((item) => this.mapStaffMatchToSuggestion(item))
             : this.suggestedDevelopers;
@@ -513,6 +540,7 @@ export class Tasks implements OnInit {
       score: 92 - index * 7,
       workload: 45 + index * 10,
       reason: `Vai trò: ${user.vaiTro}. Phù hợp để nhận task theo dữ liệu người dùng từ backend.`,
+      isAssigned: false,
     }));
   }
 
@@ -526,6 +554,7 @@ export class Tasks implements OnInit {
       experienceScore: item.diemKinhNghiem ?? null,
       model: item.tenMoHinh,
       reason: this.formatSuggestionReason(item.lyDo || 'AI đề xuất dựa trên kỹ năng, mức độ còn rảnh và kinh nghiệm lịch sử.'),
+      isAssigned: !!item.daChapNhan,
     };
   }
 

@@ -240,7 +240,7 @@
         </div>
 
         @for (developer of suggestedDevelopers; track developer.id) {
-          <div class="developer-card">
+          <div class="developer-card" [class.assigned]="isDeveloperAssigned(developer)">
             <div class="developer-main">
               <div class="developer-title">
                 <strong>{{ developer.name }}</strong>
@@ -272,8 +272,11 @@
               </div>
             </div>
 
-            <button type="button" [disabled]="isSuggestionLoading" (click)="assignDeveloper(developer)">
-              {{ isSuggestionLoading ? 'Đang xử lý' : 'Chọn' }}
+            <button
+              type="button"
+              [disabled]="isSuggestionLoading || isDeveloperAssigned(developer)"
+              (click)="assignDeveloper(developer)">
+              {{ getAssignButtonLabel(developer) }}
             </button>
           </div>
         }
