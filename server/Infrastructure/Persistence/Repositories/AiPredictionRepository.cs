@@ -48,7 +48,6 @@ namespace Infrastructure.Persistence.Repositories
             int userId,
             int projectId,
             int? sprintId,
-            int? excludedTaskId,
             CancellationToken cancellationToken = default)
         {
             var user = await _context.NguoiDungs
@@ -78,7 +77,6 @@ namespace Infrastructure.Persistence.Repositories
                 userId,
                 projectId,
                 sprintId,
-                excludedTaskId,
                 cancellationToken);
 
             var qualityScore = await _context.NangLucThanhViens
@@ -375,19 +373,8 @@ namespace Infrastructure.Persistence.Repositories
             int userId,
             int projectId,
             int? sprintId,
-            int? excludedTaskId,
             CancellationToken cancellationToken)
         {
-            if (excludedTaskId.HasValue)
-            {
-                return await GetWorkloadExcludingTaskAsync(
-                    userId,
-                    projectId,
-                    sprintId,
-                    excludedTaskId.Value,
-                    cancellationToken);
-            }
-
             var result = await _context.Database
                 .SqlQuery<AiWorkloadRow>($"""
             SELECT TOP (1)

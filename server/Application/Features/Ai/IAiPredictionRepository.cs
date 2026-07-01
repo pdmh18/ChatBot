@@ -15,7 +15,6 @@ namespace Application.Features.Ai
             int userId,
             int projectId,
             int? sprintId,
-            int? excludedTaskId,
             CancellationToken cancellationToken = default);
 
         Task<int> CountPreviousDependenciesAsync(
