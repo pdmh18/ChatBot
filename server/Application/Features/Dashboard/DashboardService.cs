@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Application.Common.Utils;
 using static Application.Common.DTOs.Dashboard.DashboardDtos;
 
 namespace Application.Features.Dashboard
@@ -11,8 +12,10 @@ namespace Application.Features.Dashboard
     {
         private const string StatusDone = "Hoan thanh";
         private const string StatusCanceled = "Da huy";
+        private const string StatusTodo = "Can lam";
+        private const string StatusBlocked = "Bi chan";
+        private const string StatusRejected = "Bi tu choi";
 
-        private const string PriorityMedium = "Trung binh";
         private const string PriorityHigh = "Cao";
         private const string PriorityUrgent = "Khan cap";
 
@@ -72,7 +75,7 @@ namespace Application.Features.Dashboard
             }
 
             return workload
-                .OrderByDescending(x => x.TongGioUocTinh)
+                .OrderByDescending(x => x.PhanTramTai)
                 .ToList();
         }
 
@@ -117,123 +120,122 @@ namespace Application.Features.Dashboard
             foreach (var task in tasks)
             {
                 task.RiskPercent = CalculateRisk(
+                    task.NgayBatDau,
                     task.HanChot,
                     task.TrangThai,
                     task.DoUuTien,
-                    task.TienDo);
+                    task.TienDo,
+                    task.SoGioUocTinh,
+                    task.MaNguoiPhuTrach);
 
                 task.RiskLevel = GetRiskLevel(task.RiskPercent);
             }
         }
 
-        private static bool IsInactiveStatus(string? status)
-        {
-            return IsSame(status, StatusDone)
-                || IsSame(status, StatusCanceled);
-        }
-
         private static int CalculateRisk(
+            DateOnly? startDate,
             DateOnly? deadline,
             string? status,
             string? priority,
-            int? progress)
+            int? progress,
+            decimal? estimatedHours,
+            int? assigneeId)
         {
-            if (IsInactiveStatus(status))
-            {
-                return 0;
-            }
-
-            var score = 0;
-            var today = DateOnly.FromDateTime(DateTime.Today);
-
-            if (deadline.HasValue)
-            {
-                var daysLeft = deadline.Value.DayNumber - today.DayNumber;
-
-                if (daysLeft < 0)
-                {
-                    score += 45;
-                }
-                else if (daysLeft <= 3)
-                {
-                    score += 25;
-                }
-                else if (daysLeft <= 7)
-                {
-                    score += 10;
-                }
-            }
-
-            if (IsSame(priority, PriorityUrgent))
-            {
-                score += 35;
-            }
-            else if (IsSame(priority, PriorityHigh))
-            {
-                score += 25;
-            }
-            else if (IsSame(priority, PriorityMedium))
-            {
-                score += 10;
-            }
-
-            var taskProgress = progress ?? 0;
-
-            if (taskProgress < 30)
-            {
-                score += 20;
-            }
-            else if (taskProgress < 60)
-            {
-                score += 10;
-            }
-
-            return Math.Clamp(score, 0, 100);
+            return TaskRiskCalculator.Calculate(
+                startDate,
+                deadline,
+                status,
+                priority,
+                progress,
+                estimatedHours,
+                assigneeId);
         }
 
         private static string GetRiskLevel(int riskPercent)
         {
-            if (riskPercent >= 70) return "Cao";
-            if (riskPercent >= 31) return "Trung binh";
-            return "Thap";
+            return TaskRiskCalculator.GetVietnameseRiskLevel(riskPercent);
         }
 
         private static string GetWorkloadLevel(decimal phanTramTai)
         {
-            if (phanTramTai >= 100) return "Qua tai";
-            if (phanTramTai >= 80) return "Cao";
-            if (phanTramTai >= 50) return "Trung binh";
+            if (phanTramTai >= 85) return "Qua tai";
+            if (phanTramTai >= 70) return "Cao";
+            if (phanTramTai >= 40) return "Trung binh";
             return "Thap";
         }
 
         private static string BuildLateRiskReason(DashboardTaskAlertDto task)
         {
             var reasons = new List<string>();
+            var today = DateOnly.FromDateTime(DateTime.Today);
 
             if (task.HanChot.HasValue)
             {
-                var daysLeft = task.HanChot.Value.DayNumber -
-                               DateOnly.FromDateTime(DateTime.Today).DayNumber;
+                var daysLeft = task.HanChot.Value.DayNumber - today.DayNumber;
 
                 if (daysLeft < 0)
                 {
-                    reasons.Add("task đã quá hạn");
+                    reasons.Add($"task đã quá hạn {Math.Abs(daysLeft)} ngày");
+                }
+                else if (daysLeft == 0)
+                {
+                    reasons.Add("task đến hạn hôm nay");
                 }
                 else if (daysLeft <= 3)
                 {
-                    reasons.Add("task sắp đến hạn");
+                    reasons.Add($"task sắp đến hạn trong {daysLeft} ngày");
+                }
+                else if (daysLeft <= 7)
+                {
+                    reasons.Add($"deadline còn {daysLeft} ngày");
                 }
             }
 
-            if ((task.TienDo ?? 0) < 30)
+            var progress = Math.Clamp(task.TienDo ?? 0, 0, 100);
+            var hasStarted = !task.NgayBatDau.HasValue || today >= task.NgayBatDau.Value;
+            var expectedProgress = TaskRiskCalculator.CalculateExpectedProgress(
+                task.NgayBatDau,
+                task.HanChot,
+                today);
+
+            if (expectedProgress.HasValue && expectedProgress.Value - progress >= 20)
+            {
+                reasons.Add($"tiến độ thấp hơn kỳ vọng khoảng {expectedProgress.Value - progress}%");
+            }
+            else if (hasStarted && progress < 30)
             {
                 reasons.Add("tiến độ còn thấp");
+            }
+
+            if (IsSame(task.TrangThai, StatusBlocked))
+            {
+                reasons.Add("task đang bị chặn");
+            }
+            else if (IsSame(task.TrangThai, StatusRejected))
+            {
+                reasons.Add("task bị từ chối, cần xử lý lại");
+            }
+            else if (IsSame(task.TrangThai, StatusTodo) &&
+                     task.NgayBatDau.HasValue &&
+                     today > task.NgayBatDau.Value)
+            {
+                reasons.Add("task đã qua ngày bắt đầu nhưng vẫn chưa làm");
+            }
+
+            if (!task.MaNguoiPhuTrach.HasValue)
+            {
+                reasons.Add("task chưa có người phụ trách");
             }
 
             if (IsSame(task.DoUuTien, PriorityHigh) ||
                 IsSame(task.DoUuTien, PriorityUrgent))
             {
                 reasons.Add("độ ưu tiên cao");
+            }
+
+            if ((task.SoGioUocTinh ?? 0m) >= 24m)
+            {
+                reasons.Add("khối lượng ước tính lớn");
             }
 
             if (reasons.Count == 0)

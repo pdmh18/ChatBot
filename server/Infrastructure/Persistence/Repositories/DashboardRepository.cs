@@ -54,6 +54,7 @@ namespace Infrastructure.Persistence.Repositories
 
                     TrangThai = x.TrangThai,
                     DoUuTien = x.DoUuTien,
+                    NgayBatDau = x.NgayBatDau,
                     HanChot = x.HanChot,
                     TienDo = x.TienDo,
                     SoGioUocTinh = x.SoGioUocTinh
@@ -62,40 +63,46 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         public async Task<IReadOnlyList<DashboardWorkloadDto>> GetWorkloadAsync(
-            int? projectId,
-            int? sprintId,
-            CancellationToken cancellationToken = default)
+    int? projectId,
+    int? sprintId,
+    CancellationToken cancellationToken = default)
         {
             var rows = await _context.Database
                 .SqlQuery<DashboardWorkloadRow>($"""
-                    SELECT
-                        CAST(w.MaNguoiDung AS INT) AS MaNguoiDung,
-                        CAST(COALESCE(MAX(nd.HoTen), N'Khong ro') AS NVARCHAR(MAX)) AS HoTen,
-                        CAST(SUM(w.SoTask) AS INT) AS SoTask,
-                        CAST(SUM(w.TongGioUocTinh) AS DECIMAL(18, 2)) AS TongGioUocTinh,
-                        CAST(
-                            CASE
-                                WHEN ISNULL(NULLIF(MAX(nd.KhoiLuongToiDa), 0), 40) <= 0 THEN 0
-                                ELSE
-                                    (
-                                        SUM(w.TongGioUocTinh)
-                                        / ISNULL(NULLIF(MAX(nd.KhoiLuongToiDa), 0), 40)
-                                    ) * 100
-                            END
-                            AS DECIMAL(18, 2)
-                        ) AS PhanTramTai
-                    FROM dbo.v_Workload_NhanSu_Sprint w
-                    INNER JOIN dbo.NguoiDung nd
-                        ON nd.MaNguoiDung = w.MaNguoiDung
-                    WHERE
-                        ({projectId} IS NULL OR w.MaDuAn = {projectId})
-                        AND ({sprintId} IS NULL OR w.MaSprint = {sprintId})
-                        AND ISNULL(nd.DangHoatDong, 1) <> 0
-                    GROUP BY
-                        w.MaNguoiDung
-                    ORDER BY
-                        SUM(w.TongGioUocTinh) DESC
-                    """)
+            WITH RankedWorkload AS
+            (
+                SELECT
+                    CAST(w.MaNguoiDung AS INT) AS MaNguoiDung,
+                    CAST(w.HoTen AS NVARCHAR(MAX)) AS HoTen,
+                    CAST(w.SoTask AS INT) AS SoTask,
+                    CAST(w.TongGioUocTinh AS DECIMAL(18, 2)) AS TongGioUocTinh,
+                    CAST(w.PhanTramTaiTongHop AS DECIMAL(18, 2)) AS PhanTramTai,
+
+                    ROW_NUMBER() OVER
+                    (
+                        PARTITION BY w.MaNguoiDung
+                        ORDER BY
+                            w.PhanTramTaiTongHop DESC,
+                            w.TongGioUocTinh DESC
+                    ) AS RowNumber
+                FROM dbo.v_Workload_NhanSu_Sprint_NangCao w
+                INNER JOIN dbo.NguoiDung nd
+                    ON nd.MaNguoiDung = w.MaNguoiDung
+                WHERE
+                    ({projectId} IS NULL OR w.MaDuAnContext = {projectId})
+                    AND ({sprintId} IS NULL OR w.MaSprintContext = {sprintId})
+                    AND ISNULL(nd.DangHoatDong, 1) <> 0
+            )
+            SELECT
+                MaNguoiDung,
+                HoTen,
+                SoTask,
+                TongGioUocTinh,
+                PhanTramTai
+            FROM RankedWorkload
+            WHERE RowNumber = 1
+            ORDER BY PhanTramTai DESC
+            """)
                 .ToListAsync(cancellationToken);
 
             return rows

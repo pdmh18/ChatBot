@@ -61,7 +61,7 @@ namespace Infrastructure.Persistence.Repositories
                     SoNamKinhNghiem = x.SoNamKinhNghiem ?? 0,
 
                     // Không dùng NguoiDung.KhoiLuongHienTai.
-                    // Workload sẽ được lấy từ view workload theo sprint.
+
                     KhoiLuongHienTai = 0m,
 
                     KhoiLuongToiDa = x.KhoiLuongToiDa ?? 40m,
@@ -78,26 +78,8 @@ namespace Infrastructure.Persistence.Repositories
                 userId,
                 projectId,
                 sprintId,
+                excludedTaskId,
                 cancellationToken);
-
-            var currentWorkload = workload.TongGioUocTinh;
-
-            if (excludedTaskId.HasValue)
-            {
-                var excludedHours = await GetExcludedTaskHoursAsync(
-                    excludedTaskId.Value,
-                    userId,
-                    projectId,
-                    sprintId,
-                    cancellationToken);
-
-                currentWorkload -= excludedHours;
-
-                if (currentWorkload < 0m)
-                {
-                    currentWorkload = 0m;
-                }
-            }
 
             var qualityScore = await _context.NangLucThanhViens
                 .AsNoTracking()
@@ -105,13 +87,25 @@ namespace Infrastructure.Persistence.Repositories
                 .Select(x => x.DiemChatLuongTrungBinh)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            user.KhoiLuongHienTai = currentWorkload;
+            user.KhoiLuongHienTai = workload.TongGioUocTinh;
             user.DiemChatLuongTrungBinh = qualityScore ?? 5m;
-            user.PhanTramTai = CalculateWorkloadRatio(
-                user.KhoiLuongHienTai,
-                user.KhoiLuongToiDa);
+            user.PhanTramTai = ClampRatio(workload.ApLucTai);
 
             return user;
+        }
+        private static decimal ClampRatio(decimal value)
+        {
+            if (value < 0m)
+            {
+                return 0m;
+            }
+
+            if (value > 1m)
+            {
+                return 1m;
+            }
+
+            return value;
         }
 
         public Task<int> CountPreviousDependenciesAsync(
@@ -381,62 +375,301 @@ namespace Infrastructure.Persistence.Repositories
             int userId,
             int projectId,
             int? sprintId,
+            int? excludedTaskId,
             CancellationToken cancellationToken)
         {
+            if (excludedTaskId.HasValue)
+            {
+                return await GetWorkloadExcludingTaskAsync(
+                    userId,
+                    projectId,
+                    sprintId,
+                    excludedTaskId.Value,
+                    cancellationToken);
+            }
+
             var result = await _context.Database
                 .SqlQuery<AiWorkloadRow>($"""
-                    SELECT
-                        CAST(ISNULL(w.SoTask, 0) AS BIGINT) AS SoTask,
-                        CAST(ISNULL(w.TongGioUocTinh, 0) AS DECIMAL(18, 2)) AS TongGioUocTinh
-                    FROM (SELECT 1 AS Dummy) d
-                    LEFT JOIN dbo.v_Workload_NhanSu_Sprint w
-                        ON w.MaDuAn = {projectId}
-                       AND w.MaNguoiDung = {userId}
-                       AND (
-                            ({sprintId} IS NULL AND w.MaSprint IS NULL)
-                            OR
-                            ({sprintId} IS NOT NULL AND w.MaSprint = {sprintId})
-                       )
-                    """)
+            SELECT TOP (1)
+                CAST(ISNULL(w.SoTask, 0) AS BIGINT) AS SoTask,
+                CAST(ISNULL(w.TongGioUocTinh, 0) AS DECIMAL(18, 2)) AS TongGioUocTinh,
+                CAST(ISNULL(w.ApLucTai, 0) AS DECIMAL(18, 4)) AS ApLucTai
+            FROM dbo.v_Workload_NhanSu_Sprint_NangCao w
+            WHERE
+                w.MaNguoiDung = {userId}
+                AND w.MaDuAnContext = {projectId}
+                AND
+                (
+                    ({sprintId} IS NOT NULL AND w.MaSprintContext = {sprintId})
+                    OR
+                    ({sprintId} IS NULL AND w.MaDuAnContext = {projectId})
+                )
+            ORDER BY
+                w.PhanTramTaiTongHop DESC,
+                w.TongGioUocTinh DESC
+            """)
                 .FirstOrDefaultAsync(cancellationToken);
 
             return result ?? new AiWorkloadRow();
         }
 
-        private async Task<decimal> GetExcludedTaskHoursAsync(
-            int taskId,
+        private async Task<AiWorkloadRow> GetWorkloadExcludingTaskAsync(
             int userId,
             int projectId,
             int? sprintId,
+            int excludedTaskId,
             CancellationToken cancellationToken)
         {
-            var query = _context.CongViecs
-                .AsNoTracking()
-                .Where(x =>
-                    x.MaCongViec == taskId &&
-                    x.MaNguoiPhuTrach == userId &&
-                    x.MaDuAn == projectId &&
+            var result = await _context.Database
+                .SqlQuery<AiWorkloadRow>($"""
+            WITH TargetContext AS
+            (
+                SELECT TOP (1)
+                    w.MaSprintContext,
+                    w.MaDuAnContext,
+                    w.NgayBatDauContext,
+                    w.NgayKetThucContext
+                FROM dbo.v_Workload_NhanSu_Sprint_NangCao w
+                WHERE
+                    w.MaNguoiDung = {userId}
+                    AND w.MaDuAnContext = {projectId}
+                    AND
                     (
-                        x.TrangThai == null ||
+                        ({sprintId} IS NOT NULL AND w.MaSprintContext = {sprintId})
+                        OR
+                        ({sprintId} IS NULL AND w.MaDuAnContext = {projectId})
+                    )
+                ORDER BY
+                    w.PhanTramTaiTongHop DESC,
+                    w.TongGioUocTinh DESC
+            ),
+            WorkItems AS
+            (
+                SELECT
+                    cv.MaCongViec,
+                    cv.MaDuAn,
+                    cv.SoGioUocTinh,
+                    cv.DoUuTien,
+                    cv.HanChot,
+                    cv.TienDo,
+                    cv.TrangThai,
+                    CASE
+                        WHEN EXISTS
                         (
-                            x.TrangThai != StatusDone &&
-                            x.TrangThai != StatusCanceled
+                            SELECT 1
+                            FROM dbo.PhuThuocCongViec p
+                            WHERE p.MaCongViecSau = cv.MaCongViec
                         )
-                    ));
-
-            if (sprintId.HasValue)
-            {
-                query = query.Where(x => x.MaSprint == sprintId.Value);
-            }
-            else
-            {
-                query = query.Where(x => x.MaSprint == null);
-            }
-
-            return await query
-                .Select(x => x.SoGioUocTinh ?? 0m)
+                        THEN 1
+                        ELSE 0
+                    END AS CoPhuThuocTruoc,
+                    CASE
+                        WHEN EXISTS
+                        (
+                            SELECT 1
+                            FROM dbo.PhuThuocCongViec p
+                            WHERE p.MaCongViecTruoc = cv.MaCongViec
+                        )
+                        THEN 1
+                        ELSE 0
+                    END AS DangChanCongViecSau
+                FROM TargetContext tc
+                JOIN dbo.Sprint sw
+                    ON sw.NgayBatDau <= tc.NgayKetThucContext
+                   AND sw.NgayKetThuc >= tc.NgayBatDauContext
+                JOIN dbo.CongViec cv
+                    ON cv.MaSprint = sw.MaSprint
+                WHERE cv.MaNguoiPhuTrach = {userId}
+                  AND cv.MaCongViec <> {excludedTaskId}
+                  AND cv.MaSprint IS NOT NULL
+                  AND ISNULL(cv.TrangThai, '') NOT IN (N'Hoan thanh', N'Da huy')
+            ),
+            Raw AS
+            (
+                SELECT
+                    CAST(COUNT_BIG(*) AS BIGINT) AS SoTask,
+                    COUNT(DISTINCT MaDuAn) AS SoDuAn,
+                    CAST(ISNULL(SUM(ISNULL(SoGioUocTinh, 0)), 0) AS DECIMAL(18, 2)) AS TongGioUocTinh,
+                    CAST(
+                        ISNULL(
+                            SUM(
+                                ISNULL(SoGioUocTinh, 0) *
+                                CASE
+                                    WHEN DoUuTien = N'Khan cap' THEN CAST(1.50 AS DECIMAL(5, 2))
+                                    WHEN DoUuTien = N'Cao' THEN CAST(1.20 AS DECIMAL(5, 2))
+                                    WHEN DoUuTien = N'Trung binh' THEN CAST(1.00 AS DECIMAL(5, 2))
+                                    WHEN DoUuTien = N'Thap' THEN CAST(0.80 AS DECIMAL(5, 2))
+                                    ELSE CAST(1.00 AS DECIMAL(5, 2))
+                                END
+                            ),
+                            0
+                        )
+                        AS DECIMAL(18, 2)
+                    ) AS TongGioQuyDoi,
+                    SUM(CASE WHEN DoUuTien = N'Cao' THEN 1 ELSE 0 END) AS SoTaskCao,
+                    SUM(CASE WHEN DoUuTien = N'Khan cap' THEN 1 ELSE 0 END) AS SoTaskKhanCap,
+                    SUM(
+                        CASE
+                            WHEN HanChot IS NOT NULL
+                             AND HanChot < CAST(GETDATE() AS DATE)
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) AS SoTaskQuaHan,
+                    SUM(
+                        CASE
+                            WHEN HanChot IS NOT NULL
+                             AND HanChot >= CAST(GETDATE() AS DATE)
+                             AND HanChot <= DATEADD(DAY, 3, CAST(GETDATE() AS DATE))
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) AS SoTaskGanHan,
+                    SUM(CASE WHEN ISNULL(TienDo, 0) < 30 THEN 1 ELSE 0 END) AS SoTaskTienDoThap,
+                    SUM(CASE WHEN TrangThai = N'Bi chan' THEN 1 ELSE 0 END) AS SoTaskBiChan,
+                    SUM(CASE WHEN CoPhuThuocTruoc = 1 THEN 1 ELSE 0 END) AS SoTaskCoPhuThuocTruoc,
+                    SUM(CASE WHEN DangChanCongViecSau = 1 THEN 1 ELSE 0 END) AS SoTaskChanCongViecSau
+                FROM WorkItems
+            ),
+            Capacity AS
+            (
+                SELECT
+                    CAST(ISNULL(NULLIF(nd.KhoiLuongToiDa, 0), 40) AS DECIMAL(18, 2)) AS KhoiLuongToiDa
+                FROM dbo.NguoiDung nd
+                WHERE nd.MaNguoiDung = {userId}
+            ),
+            Components AS
+            (
+                SELECT
+                    Raw.SoTask,
+                    Raw.SoDuAn,
+                    Raw.TongGioUocTinh,
+                    CAST(
+                        CASE
+                            WHEN Capacity.KhoiLuongToiDa <= 0 THEN 0
+                            WHEN Raw.TongGioQuyDoi / Capacity.KhoiLuongToiDa > 1 THEN 1
+                            ELSE Raw.TongGioQuyDoi / Capacity.KhoiLuongToiDa
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS GioLoad,
+                    CAST(
+                        CASE
+                            WHEN CAST(Raw.SoTask AS DECIMAL(18, 4)) / 8.0 > 1 THEN 1
+                            ELSE CAST(Raw.SoTask AS DECIMAL(18, 4)) / 8.0
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS TaskLoad,
+                    CAST(
+                        CASE
+                            WHEN CAST(Raw.SoDuAn AS DECIMAL(18, 4)) / 3.0 > 1 THEN 1
+                            ELSE CAST(Raw.SoDuAn AS DECIMAL(18, 4)) / 3.0
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS ProjectLoad,
+                    CAST(
+                        CASE
+                            WHEN Raw.SoTask <= 0 THEN 0
+                            WHEN
+                                (
+                                    (CAST(Raw.SoTaskKhanCap AS DECIMAL(18, 4)) * 1.00)
+                                    + (CAST(Raw.SoTaskCao AS DECIMAL(18, 4)) * 0.70)
+                                ) / Raw.SoTask > 1 THEN 1
+                            ELSE
+                                (
+                                    (CAST(Raw.SoTaskKhanCap AS DECIMAL(18, 4)) * 1.00)
+                                    + (CAST(Raw.SoTaskCao AS DECIMAL(18, 4)) * 0.70)
+                                ) / Raw.SoTask
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS PriorityLoad,
+                    CAST(
+                        CASE
+                            WHEN Raw.SoTask <= 0 THEN 0
+                            WHEN
+                                (
+                                    (CAST(Raw.SoTaskQuaHan AS DECIMAL(18, 4)) * 1.00)
+                                    + (CAST(Raw.SoTaskGanHan AS DECIMAL(18, 4)) * 0.70)
+                                ) / Raw.SoTask > 1 THEN 1
+                            ELSE
+                                (
+                                    (CAST(Raw.SoTaskQuaHan AS DECIMAL(18, 4)) * 1.00)
+                                    + (CAST(Raw.SoTaskGanHan AS DECIMAL(18, 4)) * 0.70)
+                                ) / Raw.SoTask
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS DeadlineLoad,
+                    CAST(
+                        CASE
+                            WHEN Raw.SoTask <= 0 THEN 0
+                            WHEN CAST(Raw.SoTaskTienDoThap AS DECIMAL(18, 4)) / Raw.SoTask > 1 THEN 1
+                            ELSE CAST(Raw.SoTaskTienDoThap AS DECIMAL(18, 4)) / Raw.SoTask
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS ProgressLoad,
+                    CAST(
+                        CASE
+                            WHEN Raw.SoTask <= 0 THEN 0
+                            WHEN
+                                (
+                                    (CAST(Raw.SoTaskBiChan AS DECIMAL(18, 4)) * 1.00)
+                                    + (CAST(Raw.SoTaskChanCongViecSau AS DECIMAL(18, 4)) * 0.50)
+                                    + (CAST(Raw.SoTaskCoPhuThuocTruoc AS DECIMAL(18, 4)) * 0.30)
+                                ) / Raw.SoTask > 1 THEN 1
+                            ELSE
+                                (
+                                    (CAST(Raw.SoTaskBiChan AS DECIMAL(18, 4)) * 1.00)
+                                    + (CAST(Raw.SoTaskChanCongViecSau AS DECIMAL(18, 4)) * 0.50)
+                                    + (CAST(Raw.SoTaskCoPhuThuocTruoc AS DECIMAL(18, 4)) * 0.30)
+                                ) / Raw.SoTask
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS BlockedLoad
+                FROM Raw
+                CROSS JOIN Capacity
+            ),
+            FinalScore AS
+            (
+                SELECT
+                    SoTask,
+                    TongGioUocTinh,
+                    CAST(
+                        CASE
+                            WHEN
+                                (
+                                    0.35 * GioLoad
+                                    + 0.12 * TaskLoad
+                                    + 0.08 * ProjectLoad
+                                    + 0.15 * PriorityLoad
+                                    + 0.15 * DeadlineLoad
+                                    + 0.10 * ProgressLoad
+                                    + 0.05 * BlockedLoad
+                                ) > 1 THEN 1
+                            ELSE
+                                (
+                                    0.35 * GioLoad
+                                    + 0.12 * TaskLoad
+                                    + 0.08 * ProjectLoad
+                                    + 0.15 * PriorityLoad
+                                    + 0.15 * DeadlineLoad
+                                    + 0.10 * ProgressLoad
+                                    + 0.05 * BlockedLoad
+                                )
+                        END
+                        AS DECIMAL(18, 4)
+                    ) AS ApLucTai
+                FROM Components
+            )
+            SELECT
+                CAST(ISNULL(SoTask, 0) AS BIGINT) AS SoTask,
+                CAST(ISNULL(TongGioUocTinh, 0) AS DECIMAL(18, 2)) AS TongGioUocTinh,
+                CAST(ISNULL(ApLucTai, 0) AS DECIMAL(18, 4)) AS ApLucTai
+            FROM FinalScore
+            """)
                 .FirstOrDefaultAsync(cancellationToken);
+
+            return result ?? new AiWorkloadRow();
         }
+
 
         private static DeXuatGiaoViecAI BuildStaffMatchEntity(
             AiTaskDataDto task,
@@ -452,8 +685,7 @@ namespace Infrastructure.Persistence.Repositories
                 DiemPhuHop = Round2(aiResult.XacSuatHieuQua),
                 DiemKyNang = Round2(user.DiemChatLuongTrungBinh),
 
-                // DiemKhoiLuong = mức độ còn rảnh.
-                // Ví dụ tải 80% thì còn rảnh 20%.
+               
                 DiemKhoiLuong = Round2(1m - user.PhanTramTai),
 
                 DiemKinhNghiem = Round2((decimal)user.SoNamKinhNghiem),
@@ -526,7 +758,7 @@ namespace Infrastructure.Persistence.Repositories
                 : aiResult.MucDoPhuHop.Trim();
 
             var workloadText =
-                $"Tai hien tai trong sprint: {user.KhoiLuongHienTai:0.##}/{user.KhoiLuongToiDa:0.##}h ({user.PhanTramTai:P0}).";
+    $"Tong gio uoc tinh: {user.KhoiLuongHienTai:0.##}/{user.KhoiLuongToiDa:0.##}h. Ap luc tai tong hop: {user.PhanTramTai:P0}.";
 
             if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
             {
@@ -576,27 +808,7 @@ namespace Infrastructure.Persistence.Repositories
             return "Thap";
         }
 
-        private static decimal CalculateWorkloadRatio(decimal current, decimal max)
-        {
-            if (max <= 0m)
-            {
-                return 0m;
-            }
-
-            var ratio = current / max;
-
-            if (ratio < 0m)
-            {
-                return 0m;
-            }
-
-            if (ratio > 1m)
-            {
-                return 1m;
-            }
-
-            return ratio;
-        }
+        
 
         private static decimal Round2(double value)
         {
@@ -640,7 +852,10 @@ namespace Infrastructure.Persistence.Repositories
         private sealed class AiWorkloadRow
         {
             public long SoTask { get; set; }
+
             public decimal TongGioUocTinh { get; set; }
+
+            public decimal ApLucTai { get; set; }
         }
     }
 }
