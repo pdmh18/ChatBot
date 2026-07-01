@@ -397,6 +397,7 @@ namespace Infrastructure.Persistence.Repositories
             FROM dbo.v_Workload_NhanSu_Sprint_NangCao w
             WHERE
                 w.MaNguoiDung = {userId}
+                AND w.MaDuAnContext = {projectId}
                 AND
                 (
                     ({sprintId} IS NOT NULL AND w.MaSprintContext = {sprintId})
@@ -431,6 +432,7 @@ namespace Infrastructure.Persistence.Repositories
                 FROM dbo.v_Workload_NhanSu_Sprint_NangCao w
                 WHERE
                     w.MaNguoiDung = {userId}
+                    AND w.MaDuAnContext = {projectId}
                     AND
                     (
                         ({sprintId} IS NOT NULL AND w.MaSprintContext = {sprintId})

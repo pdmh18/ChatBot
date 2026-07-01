@@ -192,6 +192,7 @@ namespace Application.Features.Dashboard
             }
 
             var progress = Math.Clamp(task.TienDo ?? 0, 0, 100);
+            var hasStarted = !task.NgayBatDau.HasValue || today >= task.NgayBatDau.Value;
             var expectedProgress = TaskRiskCalculator.CalculateExpectedProgress(
                 task.NgayBatDau,
                 task.HanChot,
@@ -201,7 +202,7 @@ namespace Application.Features.Dashboard
             {
                 reasons.Add($"tiến độ thấp hơn kỳ vọng khoảng {expectedProgress.Value - progress}%");
             }
-            else if (progress < 30)
+            else if (hasStarted && progress < 30)
             {
                 reasons.Add("tiến độ còn thấp");
             }
