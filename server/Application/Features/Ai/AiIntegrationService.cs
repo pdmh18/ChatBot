@@ -43,7 +43,6 @@ namespace Application.Features.Ai
                 task.MaNguoiPhuTrach.Value,
                 task.MaDuAn,
                 task.MaSprint,
-                excludedTaskId: null,
                 cancellationToken);
 
             if (user == null)
@@ -173,15 +172,10 @@ namespace Application.Features.Ai
             int userId,
             CancellationToken cancellationToken)
         {
-            int? excludedTaskId = task.MaNguoiPhuTrach == userId
-                ? task.MaCongViec
-                : null;
-
             var user = await _repository.GetUserDataAsync(
                 userId,
                 task.MaDuAn,
                 task.MaSprint,
-                excludedTaskId,
                 cancellationToken);
 
             if (user == null)
