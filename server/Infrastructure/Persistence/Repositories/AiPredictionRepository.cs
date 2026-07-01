@@ -420,7 +420,7 @@ namespace Infrastructure.Persistence.Repositories
             int excludedTaskId,
             CancellationToken cancellationToken)
         {
-            var result = await _context.Database
+            var rows = await _context.Database
                 .SqlQuery<AiWorkloadRow>($"""
             WITH TargetContext AS
             (
@@ -665,9 +665,9 @@ namespace Infrastructure.Persistence.Repositories
                 CAST(ISNULL(ApLucTai, 0) AS DECIMAL(18, 4)) AS ApLucTai
             FROM FinalScore
             """)
-                .FirstOrDefaultAsync(cancellationToken);
+                .ToListAsync(cancellationToken);
 
-            return result ?? new AiWorkloadRow();
+            return rows.FirstOrDefault() ?? new AiWorkloadRow();
         }
 
 
