@@ -61,7 +61,7 @@ namespace Infrastructure.Persistence.Repositories
                     SoNamKinhNghiem = x.SoNamKinhNghiem ?? 0,
 
                     // Không dùng NguoiDung.KhoiLuongHienTai.
-                    // Workload sẽ được lấy từ view workload theo sprint.
+
                     KhoiLuongHienTai = 0m,
 
                     KhoiLuongToiDa = x.KhoiLuongToiDa ?? 40m,
@@ -80,38 +80,35 @@ namespace Infrastructure.Persistence.Repositories
                 sprintId,
                 cancellationToken);
 
-            var currentWorkload = workload.TongGioUocTinh;
+            
 
-            if (excludedTaskId.HasValue)
-            {
-                var excludedHours = await GetExcludedTaskHoursAsync(
-                    excludedTaskId.Value,
-                    userId,
-                    projectId,
-                    sprintId,
-                    cancellationToken);
 
-                currentWorkload -= excludedHours;
-
-                if (currentWorkload < 0m)
-                {
-                    currentWorkload = 0m;
-                }
-            }
 
             var qualityScore = await _context.NangLucThanhViens
-                .AsNoTracking()
-                .Where(x => x.MaNguoiDung == userId)
-                .Select(x => x.DiemChatLuongTrungBinh)
-                .FirstOrDefaultAsync(cancellationToken);
+     .AsNoTracking()
+     .Where(x => x.MaNguoiDung == userId)
+     .Select(x => x.DiemChatLuongTrungBinh)
+     .FirstOrDefaultAsync(cancellationToken);
 
-            user.KhoiLuongHienTai = currentWorkload;
+            user.KhoiLuongHienTai = workload.TongGioUocTinh;
             user.DiemChatLuongTrungBinh = qualityScore ?? 5m;
-            user.PhanTramTai = CalculateWorkloadRatio(
-                user.KhoiLuongHienTai,
-                user.KhoiLuongToiDa);
+            user.PhanTramTai = ClampRatio(workload.ApLucTai);
 
             return user;
+        }
+        private static decimal ClampRatio(decimal value)
+        {
+            if (value < 0m)
+            {
+                return 0m;
+            }
+
+            if (value > 1m)
+            {
+                return 1m;
+            }
+
+            return value;
         }
 
         public Task<int> CountPreviousDependenciesAsync(
@@ -378,65 +375,36 @@ namespace Infrastructure.Persistence.Repositories
         }
 
         private async Task<AiWorkloadRow> GetWorkloadFromViewAsync(
-            int userId,
-            int projectId,
-            int? sprintId,
-            CancellationToken cancellationToken)
+    int userId,
+    int projectId,
+    int? sprintId,
+    CancellationToken cancellationToken)
         {
             var result = await _context.Database
                 .SqlQuery<AiWorkloadRow>($"""
-                    SELECT
-                        CAST(ISNULL(w.SoTask, 0) AS BIGINT) AS SoTask,
-                        CAST(ISNULL(w.TongGioUocTinh, 0) AS DECIMAL(18, 2)) AS TongGioUocTinh
-                    FROM (SELECT 1 AS Dummy) d
-                    LEFT JOIN dbo.v_Workload_NhanSu_Sprint w
-                        ON w.MaDuAn = {projectId}
-                       AND w.MaNguoiDung = {userId}
-                       AND (
-                            ({sprintId} IS NULL AND w.MaSprint IS NULL)
-                            OR
-                            ({sprintId} IS NOT NULL AND w.MaSprint = {sprintId})
-                       )
-                    """)
+            SELECT TOP (1)
+                CAST(ISNULL(w.SoTask, 0) AS BIGINT) AS SoTask,
+                CAST(ISNULL(w.TongGioUocTinh, 0) AS DECIMAL(18, 2)) AS TongGioUocTinh,
+                CAST(ISNULL(w.ApLucTai, 0) AS DECIMAL(18, 4)) AS ApLucTai
+            FROM dbo.v_Workload_NhanSu_Sprint_NangCao w
+            WHERE
+                w.MaNguoiDung = {userId}
+                AND
+                (
+                    ({sprintId} IS NOT NULL AND w.MaSprintContext = {sprintId})
+                    OR
+                    ({sprintId} IS NULL AND w.MaDuAnContext = {projectId})
+                )
+            ORDER BY
+                w.PhanTramTaiTongHop DESC,
+                w.TongGioUocTinh DESC
+            """)
                 .FirstOrDefaultAsync(cancellationToken);
 
             return result ?? new AiWorkloadRow();
         }
 
-        private async Task<decimal> GetExcludedTaskHoursAsync(
-            int taskId,
-            int userId,
-            int projectId,
-            int? sprintId,
-            CancellationToken cancellationToken)
-        {
-            var query = _context.CongViecs
-                .AsNoTracking()
-                .Where(x =>
-                    x.MaCongViec == taskId &&
-                    x.MaNguoiPhuTrach == userId &&
-                    x.MaDuAn == projectId &&
-                    (
-                        x.TrangThai == null ||
-                        (
-                            x.TrangThai != StatusDone &&
-                            x.TrangThai != StatusCanceled
-                        )
-                    ));
-
-            if (sprintId.HasValue)
-            {
-                query = query.Where(x => x.MaSprint == sprintId.Value);
-            }
-            else
-            {
-                query = query.Where(x => x.MaSprint == null);
-            }
-
-            return await query
-                .Select(x => x.SoGioUocTinh ?? 0m)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
+        
 
         private static DeXuatGiaoViecAI BuildStaffMatchEntity(
             AiTaskDataDto task,
@@ -452,8 +420,7 @@ namespace Infrastructure.Persistence.Repositories
                 DiemPhuHop = Round2(aiResult.XacSuatHieuQua),
                 DiemKyNang = Round2(user.DiemChatLuongTrungBinh),
 
-                // DiemKhoiLuong = mức độ còn rảnh.
-                // Ví dụ tải 80% thì còn rảnh 20%.
+               
                 DiemKhoiLuong = Round2(1m - user.PhanTramTai),
 
                 DiemKinhNghiem = Round2((decimal)user.SoNamKinhNghiem),
@@ -526,7 +493,7 @@ namespace Infrastructure.Persistence.Repositories
                 : aiResult.MucDoPhuHop.Trim();
 
             var workloadText =
-                $"Tai hien tai trong sprint: {user.KhoiLuongHienTai:0.##}/{user.KhoiLuongToiDa:0.##}h ({user.PhanTramTai:P0}).";
+    $"Tong gio uoc tinh: {user.KhoiLuongHienTai:0.##}/{user.KhoiLuongToiDa:0.##}h. Ap luc tai tong hop: {user.PhanTramTai:P0}.";
 
             if (!string.IsNullOrWhiteSpace(aiResult.NguyenNhan))
             {
@@ -576,27 +543,7 @@ namespace Infrastructure.Persistence.Repositories
             return "Thap";
         }
 
-        private static decimal CalculateWorkloadRatio(decimal current, decimal max)
-        {
-            if (max <= 0m)
-            {
-                return 0m;
-            }
-
-            var ratio = current / max;
-
-            if (ratio < 0m)
-            {
-                return 0m;
-            }
-
-            if (ratio > 1m)
-            {
-                return 1m;
-            }
-
-            return ratio;
-        }
+        
 
         private static decimal Round2(double value)
         {
@@ -640,7 +587,10 @@ namespace Infrastructure.Persistence.Repositories
         private sealed class AiWorkloadRow
         {
             public long SoTask { get; set; }
+
             public decimal TongGioUocTinh { get; set; }
+
+            public decimal ApLucTai { get; set; }
         }
     }
 }

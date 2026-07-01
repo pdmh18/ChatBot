@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Application.Common.DTOs;
+using Application.Common.Utils;
 namespace Application.Features.Tasks
 {
     public class TaskService : ITaskService
@@ -375,113 +376,50 @@ namespace Application.Features.Tasks
         private static void ApplyRiskScore(TaskListItemDto task)
         {
             var risk = CalculateRisk(
+                task.NgayBatDau,
                 task.HanChot,
                 task.TrangThai,
                 task.DoUuTien,
-                task.TienDo);
+                task.TienDo,
+                task.SoGioUocTinh,
+                task.MaNguoiPhuTrach);
 
             task.RiskPercent = risk;
-            task.RiskLevel = GetRiskLevel(risk);
+            task.RiskLevel = TaskRiskCalculator.GetEnglishRiskLevel(risk);
         }
 
         private static void ApplyRiskScore(TaskDetailDto task)
         {
             var risk = CalculateRisk(
+                task.NgayBatDau,
                 task.HanChot,
                 task.TrangThai,
                 task.DoUuTien,
-                task.TienDo);
+                task.TienDo,
+                task.SoGioUocTinh,
+                task.MaNguoiPhuTrach);
 
             task.RiskPercent = risk;
-            task.RiskLevel = GetRiskLevel(risk);
-        }
-
-        private static bool IsDoneStatus(string? status)
-        {
-            return IsSameValue(status, StatusDone)
-                || IsSameValue(status, StatusCanceled);
+            task.RiskLevel = TaskRiskCalculator.GetEnglishRiskLevel(risk);
         }
 
         private static int CalculateRisk(
+            DateOnly? startDate,
             DateOnly? deadline,
             string? status,
             string? priority,
-            int? progress)
+            int? progress,
+            decimal? estimatedHours,
+            int? assigneeId)
         {
-            if (IsDoneStatus(status))
-            {
-                return 0;
-            }
-
-            var score = 0;
-            var today = DateOnly.FromDateTime(DateTime.Today);
-
-            if (deadline.HasValue)
-            {
-                var daysLeft = deadline.Value.DayNumber - today.DayNumber;
-
-                if (daysLeft < 0)
-                {
-                    score += 45;
-                }
-                else if (daysLeft <= 3)
-                {
-                    score += 25;
-                }
-                else if (daysLeft <= 7)
-                {
-                    score += 10;
-                }
-            }
-
-            if (IsSameValue(priority, PriorityUrgent))
-            {
-                score += 35;
-            }
-            else if (IsSameValue(priority, PriorityHigh))
-            {
-                score += 25;
-            }
-            else if (IsSameValue(priority, PriorityMedium))
-            {
-                score += 10;
-            }
-
-            var taskProgress = progress ?? 0;
-
-            if (taskProgress < 30)
-            {
-                score += 20;
-            }
-            else if (taskProgress < 60)
-            {
-                score += 10;
-            }
-
-            return Math.Clamp(score, 0, 100);
-        }
-
-        private static string GetRiskLevel(int risk)
-        {
-            if (risk >= 70)
-            {
-                return "High";
-            }
-
-            if (risk >= 31)
-            {
-                return "Medium";
-            }
-
-            return "Low";
-        }
-
-        private static bool IsSameValue(string? value, string expected)
-        {
-            return string.Equals(
-                value?.Trim(),
-                expected,
-                StringComparison.OrdinalIgnoreCase);
+            return TaskRiskCalculator.Calculate(
+                startDate,
+                deadline,
+                status,
+                priority,
+                progress,
+                estimatedHours,
+                assigneeId);
         }
     }
 

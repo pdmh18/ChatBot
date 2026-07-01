@@ -44,6 +44,7 @@ namespace Application.Common.DTOs.Dashboard
             public string? TrangThai { get; set; }
             public string? DoUuTien { get; set; }
 
+            public DateOnly? NgayBatDau { get; set; }
             public DateOnly? HanChot { get; set; }
             public int? TienDo { get; set; }
             public decimal? SoGioUocTinh { get; set; }
